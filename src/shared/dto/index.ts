@@ -1,30 +1,63 @@
-/** Request/response DTOs at the gateway boundary. */
+/** Request DTOs at the gateway boundary (composition layer). */
 
-import type { ChunkCoord, EntityComponent, SceneFilter, SceneRule } from '../types';
+import type { Placement, SceneDoc, SessionStatus, Vec3 } from '../types';
 
-export interface CreateEntityDto {
-  type: string;
-  posX: number;
-  posY: number;
-  posZ: number;
-  meshId?: string | null;
-  components?: EntityComponent[];
+// --- world ---------------------------------------------------------------
+
+export interface PlacementInput {
+  id?: string;
+  scene: string; // palette key
+  position: Vec3;
+  rotation?: Vec3;
+  scale?: Vec3;
+  whenSetting?: string;
 }
 
-export interface UpdateEntityDto {
-  posX?: number;
-  posY?: number;
-  posZ?: number;
-  meshId?: string | null;
-  components?: EntityComponent[];
+/** Create/publish a world composition (the world.json payload). */
+export interface CreateWorldDto {
+  id?: string;
+  title: string;
+  version?: string;
+  comment?: string;
+  settings?: Record<string, unknown>;
+  scenes: Record<string, string>; // palette
+  world: PlacementInput[]; // placements
 }
+
+export type UpdateWorldDto = Partial<Omit<CreateWorldDto, 'id'>>;
+
+// --- scene ---------------------------------------------------------------
 
 export interface CreateSceneDto {
+  id?: string;
   name: string;
-  filter: SceneFilter;
-  rules?: SceneRule[];
+  version?: string;
+  doc: SceneDoc;
 }
 
-export interface ChunkQueryDto {
-  chunks: ChunkCoord[];
+export type UpdateSceneDto = Partial<Omit<CreateSceneDto, 'id'>>;
+
+// --- prefab --------------------------------------------------------------
+
+export interface CreatePrefabDto {
+  slug: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+  kitRef?: string;
 }
+
+// --- session -------------------------------------------------------------
+
+export interface CreateSessionDto {
+  worldId: string;
+  settings?: Record<string, unknown>;
+}
+
+export interface UpdateSessionDto {
+  status?: SessionStatus;
+  settings?: Record<string, unknown>;
+  runtimeEndpoint?: string;
+}
+
+export type { Placement };

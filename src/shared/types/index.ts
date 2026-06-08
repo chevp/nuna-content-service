@@ -1,84 +1,127 @@
 /**
- * Domain types shared across modules.
+ * Domain types — the COMPOSITION layer.
  *
- * The world is a flat set of entities partitioned into chunks. A scene is not
- * stored data — it is a query (filter + rules) whose result is computed and
- * cached at runtime. See modules/scene.
+ * The service composes scenes, worlds, prefabs and game-sessions. It never
+ * deals with individual meshes or per-coordinate entities — that is the iris
+ * engine / in-editor concern. Shapes mirror the container's `world.json`,
+ * `*.scene.json` and `.prefab` catalogs so documents round-trip losslessly.
  */
 
-export type EntityId = string;
 export type WorldId = string;
 export type SceneId = string;
-export type AssetId = string;
+export type PrefabId = string;
+export type SessionId = string;
 
-/** A 2D chunk coordinate. The world is partitioned on (chunkX, chunkY). */
-export interface ChunkCoord {
-  chunkX: number;
-  chunkY: number;
-}
+export type Vec3 = [number, number, number];
 
-/** Render-only component attached to an entity (stored as data_json). */
-export interface EntityComponent {
-  componentType: string;
-  data: Record<string, unknown>;
+// --- world composition (mirrors world.json) ------------------------------
+
+/**
+ * One placement of a scene into a world: which scene (palette key), where, and
+ * whether it is gated behind a setting. Matches container's PlacementRow.
+ */
+export interface Placement {
+  id: string;
+  scene: string; // key into WorldComposition.scenes
+  position: Vec3;
+  rotation?: Vec3; // pitch/yaw/roll degrees
+  scale?: Vec3;
+  /** When set, the placement is only active if the named setting is truthy. */
+  whenSetting?: string;
 }
 
 /**
- * Core entity record. Mirrors the `entities` table:
- *   id, type, pos_x, pos_y, pos_z, mesh_id, chunk_x, chunk_y
+ * A world is a composition: a scene palette (`scenes`) plus an ordered list of
+ * placements, plus Lua-evaluated settings. NOT a flat entity set.
  */
-export interface Entity {
-  id: EntityId;
-  type: string;
-  posX: number;
-  posY: number;
-  posZ: number;
-  meshId: AssetId | null;
-  chunkX: number;
-  chunkY: number;
-  components?: EntityComponent[];
+export interface WorldComposition {
+  id: WorldId;
+  title: string;
+  version: string;
+  comment?: string;
+  settings: Record<string, unknown>;
+  /** Palette: stable key → scene reference (scene id or relative path). */
+  scenes: Record<string, string>;
+  /** Ordered placements; the `world` array in world.json. */
+  world: Placement[];
 }
 
-/** Asset metadata — mesh / material / file path resolution. */
-export interface Asset {
-  id: AssetId;
-  kind: 'mesh' | 'material' | 'texture' | 'gltf' | 'bin';
-  uri: string;
-  materialRefs?: AssetId[];
+/** Result of resolving a world against settings: the active placements only. */
+export interface ResolvedWorld {
+  world: WorldId;
+  title: string;
+  settings: Record<string, unknown>;
+  placements: Array<Placement & { sceneRef: string }>;
 }
 
-/** How a scene selects its entity set. */
-export type SceneFilter =
-  | { kind: 'chunk'; chunks: ChunkCoord[] }
-  | { kind: 'tag'; tags: string[] }
-  | { kind: 'entity-list'; ids: EntityId[] };
+// --- scene (mirrors *.scene.json) ----------------------------------------
 
-/**
- * A scene definition. The `filter` selects entities; optional `rules` post-
- * process the set. The computed result is runtime-only (cache), never stored.
- */
-export interface SceneDefinition {
+/** Envelope of an authored scene document. Body is engine-defined and opaque. */
+export interface SceneDoc {
+  version: string;
+  scene: {
+    id: string;
+    metadata?: Record<string, unknown>;
+    camera?: Record<string, unknown>;
+    entities?: unknown[];
+    [k: string]: unknown;
+  };
+}
+
+export interface SceneRecord {
   id: SceneId;
   name: string;
-  filter: SceneFilter;
-  rules?: SceneRule[];
+  version: string;
+  doc: SceneDoc;
 }
 
-export interface SceneRule {
-  op: 'include' | 'exclude' | 'limit';
-  value: unknown;
-}
+// --- prefab (mirrors a .prefab catalog) ----------------------------------
 
-/** Computed scene payload returned to clients. */
-export interface SceneResult {
-  scene: SceneId;
-  entities: Entity[];
-  assets: Asset[];
-  computedAt: number;
-}
-
-export interface WorldState {
-  id: WorldId;
+export interface PrefabMaterial {
+  id: number;
   name: string;
-  loadedChunks: ChunkCoord[];
+  metallicFactor?: number;
+  roughnessFactor?: number;
+  baseColorFactor?: number[] | null;
+}
+
+export interface PrefabPreview {
+  materialId: number | null;
+  cameraPreset: string;
+  jpegRef: string | null; // storage reference to the cached preview frame
+}
+
+/**
+ * A prefab catalog: a reusable kit of templates + materials + preview slots.
+ * The heavy kit itself (the `.prefab` SQLite) is referenced by `kitRef`; the
+ * service indexes the catalog metadata.
+ */
+export interface PrefabCatalog {
+  id: PrefabId;
+  slug: string;
+  name: string;
+  description?: string;
+  tags: string[];
+  kitRef?: string; // storage reference to the .prefab kit blob
+  materials?: PrefabMaterial[];
+  previews?: PrefabPreview[];
+}
+
+// --- game-session --------------------------------------------------------
+
+export type SessionStatus = 'created' | 'starting' | 'running' | 'stopped' | 'error';
+
+/**
+ * A game-session is a runtime instance of a world. This service is the
+ * registry: it records the session, its world, status and settings overrides.
+ * The actual runtime is owned by iris-player / the relay daemon.
+ */
+export interface GameSession {
+  id: SessionId;
+  worldId: WorldId;
+  status: SessionStatus;
+  /** Per-session overrides layered over the world's settings. */
+  settings: Record<string, unknown>;
+  runtimeEndpoint?: string; // where the live runtime is reachable, once started
+  createdAt: number;
 }

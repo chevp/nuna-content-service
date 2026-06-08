@@ -14,23 +14,17 @@ CREATE TABLE IF NOT EXISTS worlds (
   doc_json      JSON NOT NULL    -- full WorldComposition, lossless
 );
 
--- Placements: a scene (named directly) positioned into the world, optionally
--- gated behind a setting.
+-- Placements: a scene (named directly) included in the world, in order,
+-- optionally gated behind a setting. There is NO transform here -- how a scene
+-- maps into a world is game-specific and lives in params_json (opaque), not in
+-- fixed pos/rot/scale columns.
 CREATE TABLE IF NOT EXISTS placements (
   id           VARCHAR(11) PRIMARY KEY,
   world_id     VARCHAR(11) NOT NULL,
   ordinal      INT NOT NULL,
   scene_name   VARCHAR(255) NOT NULL,
-  pos_x        DOUBLE NULL,
-  pos_y        DOUBLE NULL,
-  pos_z        DOUBLE NULL,
-  rot_x        DOUBLE NULL,
-  rot_y        DOUBLE NULL,
-  rot_z        DOUBLE NULL,
-  scale_x      DOUBLE NULL,
-  scale_y      DOUBLE NULL,
-  scale_z      DOUBLE NULL,
   when_setting VARCHAR(128) NULL,
+  params_json  JSON NULL,   -- game-specific placement data, opaque to the service
   INDEX idx_placements_world (world_id),
   CONSTRAINT fk_placements_world FOREIGN KEY (world_id)
     REFERENCES worlds (id) ON DELETE CASCADE

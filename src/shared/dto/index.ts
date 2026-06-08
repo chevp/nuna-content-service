@@ -1,16 +1,15 @@
 /** Request DTOs at the gateway boundary (composition layer). */
 
-import type { Placement, SceneDoc, SessionStatus, Vec3 } from '../types';
+import type { Placement, SceneDoc, SessionStatus } from '../types';
 
 // --- world ---------------------------------------------------------------
 
 export interface PlacementInput {
   id?: string;
   scene: string; // scene name
-  position: Vec3;
-  rotation?: Vec3;
-  scale?: Vec3;
   whenSetting?: string;
+  /** Game-specific placement data, opaque to the service. */
+  params?: Record<string, unknown>;
 }
 
 /** Create/publish a world composition (the world.json payload). */

@@ -9,7 +9,7 @@
 
 import type { Database } from '../../core/db/mariadb';
 import { QueryBuilder } from '../../core/db/mariadb';
-import type { Placement, Vec3, WorldComposition, WorldId } from '../../shared/types';
+import type { Placement, WorldComposition, WorldId } from '../../shared/types';
 
 interface WorldRow {
   id: string;
@@ -25,9 +25,6 @@ export interface WorldSummary {
   title: string;
   version: string;
 }
-
-const vec = (v: Vec3 | undefined): { x: number | null; y: number | null; z: number | null } =>
-  v ? { x: v[0], y: v[1], z: v[2] } : { x: null, y: null, z: null };
 
 export class WorldRepository {
   constructor(private readonly db: Database) {}
@@ -78,25 +75,14 @@ export class WorldRepository {
 
     let ordinal = 0;
     for (const p of world.world as Placement[]) {
-      const pos = vec(p.position);
-      const rot = vec(p.rotation);
-      const scl = vec(p.scale);
       await this.db.exec(
         QueryBuilder.table('placements').insert({
           id: p.id,
           world_id: world.id,
           ordinal: (ordinal += 1),
           scene_name: p.scene,
-          pos_x: pos.x,
-          pos_y: pos.y,
-          pos_z: pos.z,
-          rot_x: rot.x,
-          rot_y: rot.y,
-          rot_z: rot.z,
-          scale_x: scl.x,
-          scale_y: scl.y,
-          scale_z: scl.z,
           when_setting: p.whenSetting ?? null,
+          params_json: p.params ? JSON.stringify(p.params) : null,
         }),
       );
     }

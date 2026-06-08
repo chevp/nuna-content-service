@@ -8,8 +8,8 @@ const world: WorldComposition = {
   version: '1.0',
   settings: { 'game.show_garden': false },
   world: [
-    { id: 'plc_main', scene: 'Main', position: [0, 0, 0] },
-    { id: 'plc_garden', scene: 'Garden', position: [20, 0, 0], whenSetting: 'game.show_garden' },
+    { id: 'plc_main', scene: 'Main' },
+    { id: 'plc_garden', scene: 'Garden', whenSetting: 'game.show_garden' },
   ],
 };
 

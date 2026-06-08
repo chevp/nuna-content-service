@@ -12,22 +12,26 @@ export type SceneId = string;
 export type PrefabId = string;
 export type SessionId = string;
 
+/** A 3-tuple a transform-based game may carry inside placement `params`. */
 export type Vec3 = [number, number, number];
 
 // --- world composition (mirrors world.json) ------------------------------
 
 /**
- * One placement of a scene into a world: which scene (by name), where, and
- * whether it is gated behind a setting.
+ * One placement of a scene into a world: which scene (by name) is included, in
+ * what order, and whether it is gated behind a setting.
+ *
+ * It deliberately carries NO transform. How a scene maps into a world — a
+ * transform, a spawn point, a slot, or nothing at all — is game-specific, so it
+ * lives in the opaque `params` bag rather than fixed columns.
  */
 export interface Placement {
   id: string;
   scene: string; // scene name, referenced directly (no palette key)
-  position: Vec3;
-  rotation?: Vec3; // pitch/yaw/roll degrees
-  scale?: Vec3;
   /** When set, the placement is only active if the named setting is truthy. */
   whenSetting?: string;
+  /** Game-specific placement data, opaque to the service (e.g. a transform). */
+  params?: Record<string, unknown>;
 }
 
 /**

@@ -2,11 +2,12 @@
 -- Composition layer: worlds compose scenes (by name, via placements), prefabs
 -- are reusable kits, sessions are runtime instances of a world. The full
 -- authored documents are stored as JSON (doc_json); the rest are derived index
--- tables. Generated ids are base62.
+-- tables. Generated ids are base62 (12 chars); id columns are VARCHAR(24) to
+-- leave headroom for caller-supplied ids.
 
 -- --- worlds (mirror world.json) -----------------------------------------
 CREATE TABLE IF NOT EXISTS worlds (
-  id            VARCHAR(96) PRIMARY KEY,
+  id            VARCHAR(24) PRIMARY KEY,
   title         VARCHAR(255) NOT NULL,
   version       VARCHAR(32) NOT NULL DEFAULT '1.0',
   comment       TEXT NULL,
@@ -17,8 +18,8 @@ CREATE TABLE IF NOT EXISTS worlds (
 -- Placements: a scene (named directly) positioned into the world, optionally
 -- gated behind a setting.
 CREATE TABLE IF NOT EXISTS placements (
-  id           VARCHAR(96) PRIMARY KEY,
-  world_id     VARCHAR(96) NOT NULL,
+  id           VARCHAR(24) PRIMARY KEY,
+  world_id     VARCHAR(24) NOT NULL,
   ordinal      INT NOT NULL,
   scene_name   VARCHAR(255) NOT NULL,
   pos_x        DOUBLE NULL,
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS placements (
 
 -- --- scenes (mirror *.scene.json) ---------------------------------------
 CREATE TABLE IF NOT EXISTS scenes (
-  id       VARCHAR(96) PRIMARY KEY,
+  id       VARCHAR(24) PRIMARY KEY,
   name     VARCHAR(255) NOT NULL,
   version  VARCHAR(32) NOT NULL DEFAULT '1.0',
   doc_json JSON NOT NULL   -- authored scene document, opaque to the service
@@ -46,8 +47,8 @@ CREATE TABLE IF NOT EXISTS scenes (
 
 -- --- prefab catalogs (mirror a .prefab kit) -----------------------------
 CREATE TABLE IF NOT EXISTS prefabs (
-  id          VARCHAR(96) PRIMARY KEY,
-  slug        VARCHAR(96) NOT NULL UNIQUE,
+  id          VARCHAR(24) PRIMARY KEY,
+  slug        VARCHAR(64) NOT NULL UNIQUE,
   name        VARCHAR(255) NOT NULL,
   description TEXT NULL,
   tags_json   JSON NULL,
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS prefabs (
 );
 
 CREATE TABLE IF NOT EXISTS prefab_materials (
-  prefab_id              VARCHAR(96) NOT NULL,
+  prefab_id              VARCHAR(24) NOT NULL,
   material_id            INT NOT NULL,
   name                   VARCHAR(255) NOT NULL,
   metallic_factor        DOUBLE NULL,
@@ -67,7 +68,7 @@ CREATE TABLE IF NOT EXISTS prefab_materials (
 );
 
 CREATE TABLE IF NOT EXISTS prefab_previews (
-  prefab_id     VARCHAR(96) NOT NULL,
+  prefab_id     VARCHAR(24) NOT NULL,
   material_id   INT NULL,
   camera_preset VARCHAR(64) NOT NULL,
   jpeg_ref      VARCHAR(512) NULL,   -- storage reference to the cached frame
@@ -78,8 +79,8 @@ CREATE TABLE IF NOT EXISTS prefab_previews (
 
 -- --- game-sessions (runtime instances of a world) -----------------------
 CREATE TABLE IF NOT EXISTS sessions (
-  id               VARCHAR(96) PRIMARY KEY,
-  world_id         VARCHAR(96) NOT NULL,
+  id               VARCHAR(24) PRIMARY KEY,
+  world_id         VARCHAR(24) NOT NULL,
   status           VARCHAR(16) NOT NULL DEFAULT 'created',
   settings_json    JSON NOT NULL,
   runtime_endpoint VARCHAR(512) NULL,

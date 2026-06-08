@@ -20,7 +20,7 @@ Gateway          routing · auth check
   ↓
 World ─ resolves a composition (palette + placements + gating) for a runtime
   ├─ Scene    authored scene documents (referenced by the world palette)
-  ├─ Prefab   reusable .prefab catalogs (templates · materials · previews)
+  ├─ Prefab   reusable .prefab catalogs (metadata + kit URI · opaque kit)
   └─ Session  game-session registry (runtime instances of a world)
   ↓
 Cache Layer      world · scene · prefab caches
@@ -32,7 +32,7 @@ MariaDB
 
 | Noun         | What it is                                                                                  |
 |--------------|---------------------------------------------------------------------------------------------|
-| **prefab**   | A reusable `.prefab` kit: templates + materials + preview slots. Referenced by id; the kit blob lives in storage (`kitRef`). |
+| **prefab**   | A reusable `.prefab` kit, referenced by id via `kitRef` (a URI to a `.prefab` SQLite / zip / local asset). The kit's interior (meshes, materials, ...) is opaque to this service — that's the iris-engine concern. The catalog row carries only metadata + an optional `previewUri`. |
 | **scene**    | An authored `*.scene.json` unit (entities/lights/materials). Stored as an opaque document, referenced by worlds. |
 | **world**    | A composition: ordered **placements** (each names a scene + optional `whenSetting` gate + opaque game `params`) + settings. Scenes are referenced **by name** directly — no palette key. There is **no transform**: how a scene maps into a world is game-specific and lives in `params`. Mirrors `world.json`. |
 | **game-session** | A runtime instance of a world. This service is the **registry** (world ref, status, settings overrides, runtime endpoint); the runtime itself is owned by iris-player / the relay daemon. |
@@ -75,9 +75,7 @@ worlds(id, title, version, comment, settings_json, doc_json)
   placements(id, world_id, ordinal, scene_name,       -- placement index
              when_setting, params_json)               -- params_json: opaque game data
 scenes(id, name, version, doc_json)
-prefabs(id, slug, name, description, tags_json, kit_ref)
-  prefab_materials(prefab_id, material_id, ...)
-  prefab_previews(prefab_id, material_id, camera_preset, jpeg_ref)
+prefabs(id, slug, name, description, tags_json, kit_ref, preview_uri)
 sessions(id, world_id, status, settings_json, runtime_endpoint, created_at)
 ```
 
@@ -111,7 +109,7 @@ The resolve logic is pure (`world.resolve.ts`) and unit-tested.
 | PATCH/DELETE | `/scene/:id`    | Update / delete a scene.                           |
 | GET    | `/prefab`             | List prefab catalogs.                              |
 | POST   | `/prefab`             | Register a prefab catalog.                         |
-| GET    | `/prefab/:id`         | Catalog + materials + resolved preview refs.       |
+| GET    | `/prefab/:id`         | Catalog metadata + resolved kit / preview refs.    |
 | DELETE | `/prefab/:id`         | Delete a prefab.                                   |
 | GET    | `/session`            | List game-sessions.                                |
 | POST   | `/session`            | Create a session for a world.                      |

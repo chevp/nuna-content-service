@@ -5,7 +5,7 @@ migration that has shipped — add a new one.
 
 ```
 001_init_schema.sql   tables: worlds, placements, scenes,
-                              prefabs, prefab_materials, prefab_previews, sessions
+                              prefabs, sessions
 ```
 
 `seeds/` (sibling directory) populates a development dataset and runs **after**

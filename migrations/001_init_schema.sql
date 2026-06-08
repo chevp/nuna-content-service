@@ -39,35 +39,18 @@ CREATE TABLE IF NOT EXISTS scenes (
 );
 
 -- --- prefab catalogs (mirror a .prefab kit) -----------------------------
+-- A prefab is just a referenced kit: the service indexes catalog metadata and
+-- a load reference (`kit_ref`, a URI to a .prefab SQLite / zip / local asset).
+-- The kit's interior (meshes, materials, ...) is opaque to this service and is
+-- the iris-engine concern -- so there are NO material/render columns here.
 CREATE TABLE IF NOT EXISTS prefabs (
-  id          VARCHAR(11) PRIMARY KEY,
-  slug        VARCHAR(64) NOT NULL UNIQUE,
-  name        VARCHAR(255) NOT NULL,
-  description TEXT NULL,
-  tags_json   JSON NULL,
-  kit_ref     VARCHAR(512) NULL   -- storage reference to the .prefab kit blob
-);
-
-CREATE TABLE IF NOT EXISTS prefab_materials (
-  prefab_id              VARCHAR(11) NOT NULL,
-  material_id            INT NOT NULL,
-  name                   VARCHAR(255) NOT NULL,
-  metallic_factor        DOUBLE NULL,
-  roughness_factor       DOUBLE NULL,
-  base_color_factor_json JSON NULL,
-  PRIMARY KEY (prefab_id, material_id),
-  CONSTRAINT fk_prefab_materials FOREIGN KEY (prefab_id)
-    REFERENCES prefabs (id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS prefab_previews (
-  prefab_id     VARCHAR(11) NOT NULL,
-  material_id   INT NULL,
-  camera_preset VARCHAR(64) NOT NULL,
-  jpeg_ref      VARCHAR(512) NULL,   -- storage reference to the cached frame
-  INDEX idx_prefab_previews (prefab_id),
-  CONSTRAINT fk_prefab_previews FOREIGN KEY (prefab_id)
-    REFERENCES prefabs (id) ON DELETE CASCADE
+  id              VARCHAR(11) PRIMARY KEY,
+  slug            VARCHAR(64) NOT NULL UNIQUE,
+  name            VARCHAR(255) NOT NULL,
+  description     TEXT NULL,
+  tags_json       JSON NULL,
+  kit_ref         VARCHAR(512) NULL,  -- storage reference / URI to the .prefab kit
+  preview_uri     VARCHAR(512) NULL   -- optional path to a single catalog preview image
 );
 
 -- --- game-sessions (runtime instances of a world) -----------------------

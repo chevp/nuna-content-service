@@ -79,24 +79,11 @@ export interface SceneRecord {
 
 // --- prefab (mirrors a .prefab catalog) ----------------------------------
 
-export interface PrefabMaterial {
-  id: number;
-  name: string;
-  metallicFactor?: number;
-  roughnessFactor?: number;
-  baseColorFactor?: number[] | null;
-}
-
-export interface PrefabPreview {
-  materialId: number | null;
-  cameraPreset: string;
-  jpegRef: string | null; // storage reference to the cached preview frame
-}
-
 /**
- * A prefab catalog: a reusable kit of templates + materials + preview slots.
- * The heavy kit itself (the `.prefab` SQLite) is referenced by `kitRef`; the
- * service indexes the catalog metadata.
+ * A prefab catalog: a reusable kit referenced by scenes/worlds. The kit itself
+ * (the `.prefab` SQLite / zip / local asset) is referenced by `kitRef` and is
+ * opaque to this service -- its interior (meshes, materials, ...) is the
+ * iris-engine concern. The service only indexes catalog metadata.
  */
 export interface PrefabCatalog {
   id: PrefabId;
@@ -104,9 +91,8 @@ export interface PrefabCatalog {
   name: string;
   description?: string;
   tags: string[];
-  kitRef?: string; // storage reference to the .prefab kit blob
-  materials?: PrefabMaterial[];
-  previews?: PrefabPreview[];
+  kitRef?: string; // storage reference / URI to the .prefab kit
+  previewUri?: string; // optional path to a single catalog preview image
 }
 
 // --- game-session --------------------------------------------------------

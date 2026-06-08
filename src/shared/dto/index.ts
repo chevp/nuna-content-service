@@ -43,6 +43,7 @@ export interface CreatePrefabDto {
   description?: string;
   tags?: string[];
   kitRef?: string;
+  previewUri?: string;
 }
 
 // --- session -------------------------------------------------------------

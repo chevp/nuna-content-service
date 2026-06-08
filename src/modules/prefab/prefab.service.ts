@@ -2,8 +2,8 @@
  * Prefab service — register and serve prefab catalogs.
  *
  * A prefab is a reusable kit referenced by scenes/worlds. The service indexes
- * the catalog and resolves the kit's storage reference; preview frames are
- * resolved through the storage adapter too.
+ * the catalog and resolves the kit's storage reference; the optional preview
+ * image is resolved through the storage adapter too.
  */
 
 import type { AppContext } from '../../core/context';
@@ -33,14 +33,11 @@ export class PrefabService {
     const prefab = await this.repo.findById(id);
     if (!prefab) return null;
 
-    // Resolve storage references for the kit + preview frames.
+    // Resolve storage references for the kit + the optional preview image.
     const resolved: PrefabCatalog = {
       ...prefab,
       kitRef: prefab.kitRef ? this.ctx.storage.resolve(prefab.kitRef) : undefined,
-      previews: prefab.previews?.map((p) => ({
-        ...p,
-        jpegRef: p.jpegRef ? this.ctx.storage.resolve(p.jpegRef) : null,
-      })),
+      previewUri: prefab.previewUri ? this.ctx.storage.resolve(prefab.previewUri) : undefined,
     };
     await this.ctx.cache.prefab.set(prefabCacheKey(id), resolved, CACHE_TTL.prefab);
     return resolved;
@@ -54,6 +51,7 @@ export class PrefabService {
       description: dto.description,
       tags: dto.tags ?? [],
       kitRef: dto.kitRef,
+      previewUri: dto.previewUri,
     };
     await this.repo.save(prefab);
     await this.ctx.cache.prefab.del(prefabCacheKey(prefab.id));

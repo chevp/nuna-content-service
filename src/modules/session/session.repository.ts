@@ -8,7 +8,7 @@ interface SessionRow {
   id: string;
   world_id: string;
   status: SessionStatus;
-  settings_json: string;
+  props_json: string;
   runtime_endpoint: string | null;
   created_at: number;
 }
@@ -17,7 +17,7 @@ const toSession = (row: SessionRow): GameSession => ({
   id: row.id,
   worldId: row.world_id,
   status: row.status,
-  settings: JSON.parse(row.settings_json),
+  props: JSON.parse(row.props_json),
   runtimeEndpoint: row.runtime_endpoint ?? undefined,
   createdAt: row.created_at,
 });
@@ -45,7 +45,7 @@ export class SessionRepository {
         id: session.id,
         world_id: session.worldId,
         status: session.status,
-        settings_json: JSON.stringify(session.settings),
+        props_json: JSON.stringify(session.props),
         runtime_endpoint: session.runtimeEndpoint ?? null,
         created_at: session.createdAt,
       }),
@@ -58,7 +58,7 @@ export class SessionRepository {
         .where('id', session.id)
         .update({
           status: session.status,
-          settings_json: JSON.stringify(session.settings),
+          props_json: JSON.stringify(session.props),
           runtime_endpoint: session.runtimeEndpoint ?? null,
         }),
     );

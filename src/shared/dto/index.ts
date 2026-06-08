@@ -50,12 +50,14 @@ export interface CreatePrefabDto {
 
 export interface CreateSessionDto {
   worldId: string;
-  settings?: Record<string, unknown>;
+  /** Opaque props bag (name, gameMode, maxPlayers, players, backend, …). */
+  props?: Record<string, unknown>;
 }
 
 export interface UpdateSessionDto {
   status?: SessionStatus;
-  settings?: Record<string, unknown>;
+  /** Replaces the entire props bag. Merge before sending if partial update is needed. */
+  props?: Record<string, unknown>;
   runtimeEndpoint?: string;
 }
 

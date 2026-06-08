@@ -101,15 +101,32 @@ export type SessionStatus = 'created' | 'starting' | 'running' | 'stopped' | 'er
 
 /**
  * A game-session is a runtime instance of a world. This service is the
- * registry: it records the session, its world, status and settings overrides.
- * The actual runtime is owned by iris-player / the relay daemon.
+ * registry: it records the session, its world, status and runtime endpoint.
+ *
+ * `props` is an opaque JSON bag owned by the caller. The service stores and
+ * returns it verbatim — game-specific data (name, gameMode, maxPlayers,
+ * players, backend, …) lives here, not in fixed columns.
  */
 export interface GameSession {
   id: SessionId;
   worldId: WorldId;
   status: SessionStatus;
-  /** Per-session overrides layered over the world's settings. */
-  settings: Record<string, unknown>;
+  /** Opaque properties bag — callers own this entirely. */
+  props: Record<string, unknown>;
   runtimeEndpoint?: string; // where the live runtime is reachable, once started
   createdAt: number;
+}
+
+/** The session/1 descriptor shape — matches the .session YAML files read by iris-player. */
+export interface SessionDescriptor {
+  kind: 'session/1';
+  name: string;
+  source: {
+    driver: 'nuna' | 'local';
+    url?: string;
+    gameMode?: string;
+    sessionId: string;
+  };
+  scene: string;
+  backend: string;
 }

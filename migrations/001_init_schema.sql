@@ -54,13 +54,16 @@ CREATE TABLE IF NOT EXISTS prefabs (
 );
 
 -- --- game-sessions (runtime instances of a world) -----------------------
+-- props_json: opaque bag — callers store whatever they need
+--             (e.g. { name, gameMode, maxPlayers, players, backend, … }).
+--             The service never interprets this; it is passed through verbatim.
 CREATE TABLE IF NOT EXISTS sessions (
   id               VARCHAR(11) PRIMARY KEY,
   world_id         VARCHAR(11) NOT NULL,
   status           VARCHAR(16) NOT NULL DEFAULT 'created',
-  settings_json    JSON NOT NULL,
+  props_json       JSON        NOT NULL DEFAULT (JSON_OBJECT()),
   runtime_endpoint VARCHAR(512) NULL,
-  created_at       BIGINT NOT NULL,
+  created_at       BIGINT      NOT NULL,
   INDEX idx_sessions_world (world_id),
   CONSTRAINT fk_sessions_world FOREIGN KEY (world_id)
     REFERENCES worlds (id) ON DELETE CASCADE

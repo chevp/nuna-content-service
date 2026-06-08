@@ -2,14 +2,14 @@
  * Session service — the game-session registry.
  *
  * A game-session is a runtime instance of a world. This service owns the
- * session record (world reference, status, settings overrides, runtime
- * endpoint); the actual runtime is driven by iris-player / the relay daemon.
+ * session record (world reference, status, opaque props, runtime endpoint);
+ * the actual runtime is driven by iris-player / the relay daemon.
  * Status transitions emit events so the realtime module can push updates.
  */
 
 import type { AppContext } from '../../core/context';
 import type { CreateSessionDto, UpdateSessionDto } from '../../shared/dto';
-import type { GameSession, SessionId, SessionStatus } from '../../shared/types';
+import type { GameSession, SessionDescriptor, SessionId, SessionStatus } from '../../shared/types';
 import { base62Id } from '../../shared/utils';
 import { WorldRepository } from '../world/world.repository';
 import { SessionRepository } from './session.repository';
@@ -40,7 +40,7 @@ export class SessionService {
       id: base62Id(),
       worldId: dto.worldId,
       status: 'created',
-      settings: dto.settings ?? {},
+      props: dto.props ?? {},
       createdAt: Date.now(),
     };
     await this.repo.insert(session);
@@ -59,7 +59,7 @@ export class SessionService {
     const next: GameSession = {
       ...current,
       status: dto.status ?? current.status,
-      settings: dto.settings ?? current.settings,
+      props: dto.props ?? current.props,
       runtimeEndpoint: dto.runtimeEndpoint ?? current.runtimeEndpoint,
     };
     await this.repo.update(next);
@@ -68,6 +68,28 @@ export class SessionService {
       await this.emitStatus(id, dto.status);
     }
     return next;
+  }
+
+  /**
+   * Build the session/1 descriptor that iris-player reads.
+   * game-specific fields (gameMode, name) are read from session.props.
+   */
+  async descriptor(id: SessionId): Promise<SessionDescriptor | null> {
+    const session = await this.repo.findById(id);
+    if (!session) return null;
+
+    const props = session.props as Record<string, unknown>;
+    return {
+      kind: 'session/1',
+      name: typeof props['name'] === 'string' ? props['name'] : `Session ${session.id}`,
+      source: {
+        driver: 'nuna',
+        gameMode: typeof props['gameMode'] === 'string' ? props['gameMode'] : undefined,
+        sessionId: session.id,
+      },
+      scene: session.worldId,
+      backend: typeof props['backend'] === 'string' ? props['backend'] : 'relay',
+    };
   }
 
   /** Convenience transition used by lifecycle endpoints. */

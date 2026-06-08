@@ -1,4 +1,4 @@
-/** Game-session HTTP controller — create/list/fetch sessions and drive status. */
+/** Game-session HTTP controller — create/list/fetch sessions, drive status, serve descriptor. */
 
 import { Router } from 'express';
 import type { AppContext } from '../../core/context';
@@ -61,6 +61,20 @@ export function sessionController(ctx: AppContext): Router {
     asyncHandler(async (req, res) => {
       const ok = await service.delete(req.params.id);
       res.status(ok ? 204 : 404).end();
+    }),
+  );
+
+  // Return the session/1 descriptor — the format iris-player reads from .session files.
+  // Props bag provides name, gameMode, backend; worldId becomes the scene reference.
+  router.get(
+    '/:id/descriptor',
+    asyncHandler(async (req, res) => {
+      const desc = await service.descriptor(req.params.id);
+      if (!desc) {
+        res.status(404).json({ error: 'session not found' });
+        return;
+      }
+      res.json(desc);
     }),
   );
 

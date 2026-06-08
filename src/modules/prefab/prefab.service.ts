@@ -10,7 +10,7 @@ import type { AppContext } from '../../core/context';
 import { CACHE_TTL } from '../../shared/constants';
 import type { CreatePrefabDto } from '../../shared/dto';
 import type { PrefabCatalog, PrefabId } from '../../shared/types';
-import { newId, slugify } from '../../shared/utils';
+import { base62Id, slugify } from '../../shared/utils';
 import { PrefabRepository, type PrefabSummary } from './prefab.repository';
 
 const prefabCacheKey = (id: PrefabId) => `prefab:${id}`;
@@ -48,7 +48,7 @@ export class PrefabService {
 
   async register(dto: CreatePrefabDto): Promise<PrefabCatalog> {
     const prefab: PrefabCatalog = {
-      id: dto.slug ? slugify(dto.slug) : newId('prefab'),
+      id: base62Id(),
       slug: slugify(dto.slug),
       name: dto.name,
       description: dto.description,

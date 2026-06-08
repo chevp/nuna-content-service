@@ -4,7 +4,7 @@ Ordered, append-only schema migrations. Apply in filename order; never edit a
 migration that has shipped — add a new one.
 
 ```
-001_init_schema.sql   tables: worlds, world_scenes, placements, scenes,
+001_init_schema.sql   tables: worlds, placements, scenes,
                               prefabs, prefab_materials, prefab_previews, sessions
 ```
 

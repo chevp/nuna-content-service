@@ -10,7 +10,7 @@ import type { AppContext } from '../../core/context';
 import { CACHE_TTL, DEFAULT_VERSION } from '../../shared/constants';
 import type { CreateWorldDto, UpdateWorldDto } from '../../shared/dto';
 import type { Placement, ResolvedWorld, WorldComposition, WorldId } from '../../shared/types';
-import { newId, slugify } from '../../shared/utils';
+import { base62Id } from '../../shared/utils';
 import { WorldRepository, type WorldSummary } from './world.repository';
 import { resolveWorld } from './world.resolve';
 
@@ -34,17 +34,16 @@ export class WorldService {
 
   /** Create or replace a world composition (publish world.json). */
   async publish(dto: CreateWorldDto): Promise<WorldComposition> {
-    const id = dto.id ?? slugify(dto.title) ?? newId('world');
+    const id = dto.id ?? base62Id();
     const world: WorldComposition = {
       id,
       title: dto.title,
       version: dto.version ?? DEFAULT_VERSION,
       comment: dto.comment,
       settings: dto.settings ?? {},
-      scenes: dto.scenes,
       world: dto.world.map(
         (p): Placement => ({
-          id: p.id ?? newId('plc'),
+          id: p.id ?? base62Id(),
           scene: p.scene,
           position: p.position,
           rotation: p.rotation,

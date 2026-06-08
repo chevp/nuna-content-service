@@ -10,7 +10,7 @@
 import type { AppContext } from '../../core/context';
 import type { CreateSessionDto, UpdateSessionDto } from '../../shared/dto';
 import type { GameSession, SessionId, SessionStatus } from '../../shared/types';
-import { newId } from '../../shared/utils';
+import { base62Id } from '../../shared/utils';
 import { WorldRepository } from '../world/world.repository';
 import { SessionRepository } from './session.repository';
 
@@ -37,7 +37,7 @@ export class SessionService {
     if (!world) return null;
 
     const session: GameSession = {
-      id: newId('sess'),
+      id: base62Id(),
       worldId: dto.worldId,
       status: 'created',
       settings: dto.settings ?? {},

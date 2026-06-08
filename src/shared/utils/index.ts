@@ -1,5 +1,6 @@
 /** Small cross-cutting helpers: logger, async route wrapper, ids. */
 
+import { randomBytes } from 'node:crypto';
 import type { RequestHandler } from 'express';
 
 export const logger = {
@@ -14,9 +15,15 @@ export const asyncHandler =
   (req, res, next) =>
     Promise.resolve(fn(req, res, next)).catch(next);
 
-let counter = 0;
-/** Deterministic-ish id (no Date.now/random dependency at import time). */
-export const newId = (prefix = 'id'): string => `${prefix}_${(counter += 1).toString(36)}`;
+const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+
+/** Generate a random base62 identifier (default 12 chars ≈ 71 bits). */
+export const base62Id = (size = 12): string => {
+  const bytes = randomBytes(size);
+  let out = '';
+  for (let i = 0; i < size; i += 1) out += BASE62[bytes[i] % 62];
+  return out;
+};
 
 /** Slugify a name into a stable, url-safe key. */
 export const slugify = (s: string): string =>

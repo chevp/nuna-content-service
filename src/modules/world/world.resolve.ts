@@ -1,7 +1,7 @@
 /**
  * Pure world-resolution: given a world composition and an effective settings
- * map, compute the ACTIVE placements (gating applied) with their scene palette
- * references resolved. This is the "compose" step — no IO, fully testable.
+ * map, compute the ACTIVE placements (gating applied). Each placement names its
+ * scene directly. This is the "compose" step — no IO, fully testable.
  */
 
 import type { Placement, ResolvedWorld, WorldComposition } from '../../shared/types';
@@ -23,16 +23,14 @@ export function isPlacementActive(p: Placement, settings: Record<string, unknown
 
 /**
  * Resolve a world against optional per-request setting overrides. Returns only
- * the active placements, each annotated with the palette `sceneRef` it points at.
+ * the active placements (gating applied); each names the scene it places.
  */
 export function resolveWorld(
   world: WorldComposition,
   overrides: Record<string, unknown> = {},
 ): ResolvedWorld {
   const settings = { ...world.settings, ...overrides };
-  const placements = world.world
-    .filter((p) => isPlacementActive(p, settings))
-    .map((p) => ({ ...p, sceneRef: world.scenes[p.scene] ?? p.scene }));
+  const placements = world.world.filter((p) => isPlacementActive(p, settings));
 
   return { world: world.id, title: world.title, settings, placements };
 }

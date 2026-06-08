@@ -6,7 +6,7 @@ import type { Placement, SceneDoc, SessionStatus, Vec3 } from '../types';
 
 export interface PlacementInput {
   id?: string;
-  scene: string; // palette key
+  scene: string; // scene name
   position: Vec3;
   rotation?: Vec3;
   scale?: Vec3;
@@ -20,8 +20,7 @@ export interface CreateWorldDto {
   version?: string;
   comment?: string;
   settings?: Record<string, unknown>;
-  scenes: Record<string, string>; // palette
-  world: PlacementInput[]; // placements
+  world: PlacementInput[]; // placements (each names a scene)
 }
 
 export type UpdateWorldDto = Partial<Omit<CreateWorldDto, 'id'>>;

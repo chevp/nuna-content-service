@@ -1,7 +1,8 @@
 -- 001_init_schema — canonical DDL for nuna-content-service.
--- Composition layer: worlds compose scenes (palette + placements), prefabs are
--- reusable kits, sessions are runtime instances of a world. The full authored
--- documents are stored as JSON (doc_json); the rest are derived index tables.
+-- Composition layer: worlds compose scenes (by name, via placements), prefabs
+-- are reusable kits, sessions are runtime instances of a world. The full
+-- authored documents are stored as JSON (doc_json); the rest are derived index
+-- tables. Generated ids are base62.
 
 -- --- worlds (mirror world.json) -----------------------------------------
 CREATE TABLE IF NOT EXISTS worlds (
@@ -13,23 +14,13 @@ CREATE TABLE IF NOT EXISTS worlds (
   doc_json      JSON NOT NULL    -- full WorldComposition, lossless
 );
 
--- Scene palette: stable key -> scene reference (scene id or relative path).
-CREATE TABLE IF NOT EXISTS world_scenes (
-  world_id  VARCHAR(96) NOT NULL,
-  scene_key VARCHAR(96) NOT NULL,
-  scene_ref VARCHAR(512) NOT NULL,
-  PRIMARY KEY (world_id, scene_key),
-  CONSTRAINT fk_world_scenes_world FOREIGN KEY (world_id)
-    REFERENCES worlds (id) ON DELETE CASCADE
-);
-
--- Placements: a scene from the palette positioned into the world, optionally
+-- Placements: a scene (named directly) positioned into the world, optionally
 -- gated behind a setting.
 CREATE TABLE IF NOT EXISTS placements (
   id           VARCHAR(96) PRIMARY KEY,
   world_id     VARCHAR(96) NOT NULL,
   ordinal      INT NOT NULL,
-  scene_key    VARCHAR(96) NOT NULL,
+  scene_name   VARCHAR(255) NOT NULL,
   pos_x        DOUBLE NULL,
   pos_y        DOUBLE NULL,
   pos_z        DOUBLE NULL,

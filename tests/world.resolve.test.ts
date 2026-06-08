@@ -7,10 +7,9 @@ const world: WorldComposition = {
   title: 'Overworld',
   version: '1.0',
   settings: { 'game.show_garden': false },
-  scenes: { main: 'main', garden: 'garden' },
   world: [
-    { id: 'plc_main', scene: 'main', position: [0, 0, 0] },
-    { id: 'plc_garden', scene: 'garden', position: [20, 0, 0], whenSetting: 'game.show_garden' },
+    { id: 'plc_main', scene: 'Main', position: [0, 0, 0] },
+    { id: 'plc_garden', scene: 'Garden', position: [20, 0, 0], whenSetting: 'game.show_garden' },
   ],
 };
 
@@ -36,7 +35,7 @@ describe('resolveWorld', () => {
   it('includes gated placements when an override turns the setting on', () => {
     const r = resolveWorld(world, { 'game.show_garden': true });
     expect(r.placements.map((p) => p.id)).toEqual(['plc_main', 'plc_garden']);
-    // palette reference is resolved onto each placement
-    expect(r.placements[1].sceneRef).toBe('garden');
+    // placements name their scene directly
+    expect(r.placements[1].scene).toBe('Garden');
   });
 });

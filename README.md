@@ -34,7 +34,7 @@ MariaDB
 |--------------|---------------------------------------------------------------------------------------------|
 | **prefab**   | A reusable `.prefab` kit: templates + materials + preview slots. Referenced by id; the kit blob lives in storage (`kitRef`). |
 | **scene**    | An authored `*.scene.json` unit (entities/lights/materials). Stored as an opaque document, referenced by worlds. |
-| **world**    | A composition: a scene **palette** (`scenes: {key → ref}`) + ordered **placements** (a scene key + position/rotation/scale + optional `whenSetting` gate) + settings. Mirrors `world.json`. |
+| **world**    | A composition: ordered **placements** (each names a scene + position/rotation/scale + optional `whenSetting` gate) + settings. Scenes are referenced **by name** directly — no palette key. Mirrors `world.json`. |
 | **game-session** | A runtime instance of a world. This service is the **registry** (world ref, status, settings overrides, runtime endpoint); the runtime itself is owned by iris-player / the relay daemon. |
 
 ### Modules (`src/modules/`)
@@ -68,10 +68,11 @@ Each authored artifact is stored as its **canonical JSON document** (lossless
 round-trip with the container's files), with derived **index tables** for
 querying and gating:
 
+Generated record ids are **base62** (e.g. `7dKq2mX9aB0c`).
+
 ```
 worlds(id, title, version, comment, settings_json, doc_json)
-  world_scenes(world_id, scene_key, scene_ref)        -- palette index
-  placements(id, world_id, ordinal, scene_key,        -- placement index
+  placements(id, world_id, ordinal, scene_name,       -- placement index
              pos_*, rot_*, scale_*, when_setting)
 scenes(id, name, version, doc_json)
 prefabs(id, slug, name, description, tags_json, kit_ref)
@@ -84,12 +85,11 @@ sessions(id, world_id, status, settings_json, runtime_endpoint, created_at)
 
 A world is resolved against effective settings to produce the **active**
 placements a runtime should load. Gated placements (`whenSetting`) are dropped
-unless their setting is truthy; each surviving placement is annotated with the
-palette `sceneRef`:
+unless their setting is truthy; each surviving placement names its scene:
 
 ```
 POST /world/overworld/resolve   { "settings": { "game.show_garden": true } }
-→ { world, title, settings, placements: [ { id, scene, sceneRef, position, … } ] }
+→ { world, title, settings, placements: [ { id, scene, position, … } ] }
 ```
 
 The resolve logic is pure (`world.resolve.ts`) and unit-tested.

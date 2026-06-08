@@ -1,9 +1,10 @@
 /**
- * World persistence — canonical document + index tables.
+ * World persistence — canonical document + placement index.
  *
  * The full `WorldComposition` is stored as `doc_json` (lossless round-trip with
- * the container's world.json). The `world_scenes` (palette) and `placements`
- * index tables are derived from it for querying/gating, and rewritten on save.
+ * the container's world.json). The `placements` index table is derived from it
+ * for querying/gating, and rewritten on save. Placements name their scene
+ * directly — there is no palette.
  */
 
 import type { Database } from '../../core/db/mariadb';
@@ -67,25 +68,13 @@ export class WorldRepository {
 
   async delete(id: WorldId): Promise<boolean> {
     await this.db.exec(QueryBuilder.table('placements').where('world_id', id).delete());
-    await this.db.exec(QueryBuilder.table('world_scenes').where('world_id', id).delete());
     const affected = await this.db.exec(QueryBuilder.table('worlds').where('id', id).delete());
     return affected > 0;
   }
 
-  /** Rebuild the palette + placement index rows from the canonical document. */
+  /** Rebuild the placement index rows from the canonical document. */
   private async rewriteIndex(world: WorldComposition): Promise<void> {
-    await this.db.exec(QueryBuilder.table('world_scenes').where('world_id', world.id).delete());
     await this.db.exec(QueryBuilder.table('placements').where('world_id', world.id).delete());
-
-    for (const [key, ref] of Object.entries(world.scenes)) {
-      await this.db.exec(
-        QueryBuilder.table('world_scenes').insert({
-          world_id: world.id,
-          scene_key: key,
-          scene_ref: ref,
-        }),
-      );
-    }
 
     let ordinal = 0;
     for (const p of world.world as Placement[]) {
@@ -97,7 +86,7 @@ export class WorldRepository {
           id: p.id,
           world_id: world.id,
           ordinal: (ordinal += 1),
-          scene_key: p.scene,
+          scene_name: p.scene,
           pos_x: pos.x,
           pos_y: pos.y,
           pos_z: pos.z,

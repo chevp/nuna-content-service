@@ -17,12 +17,12 @@ export type Vec3 = [number, number, number];
 // --- world composition (mirrors world.json) ------------------------------
 
 /**
- * One placement of a scene into a world: which scene (palette key), where, and
- * whether it is gated behind a setting. Matches container's PlacementRow.
+ * One placement of a scene into a world: which scene (by name), where, and
+ * whether it is gated behind a setting.
  */
 export interface Placement {
   id: string;
-  scene: string; // key into WorldComposition.scenes
+  scene: string; // scene name, referenced directly (no palette key)
   position: Vec3;
   rotation?: Vec3; // pitch/yaw/roll degrees
   scale?: Vec3;
@@ -31,8 +31,8 @@ export interface Placement {
 }
 
 /**
- * A world is a composition: a scene palette (`scenes`) plus an ordered list of
- * placements, plus Lua-evaluated settings. NOT a flat entity set.
+ * A world is a composition: an ordered list of placements (each naming a scene)
+ * plus Lua-evaluated settings. NOT a flat entity set.
  */
 export interface WorldComposition {
   id: WorldId;
@@ -40,8 +40,6 @@ export interface WorldComposition {
   version: string;
   comment?: string;
   settings: Record<string, unknown>;
-  /** Palette: stable key → scene reference (scene id or relative path). */
-  scenes: Record<string, string>;
   /** Ordered placements; the `world` array in world.json. */
   world: Placement[];
 }
@@ -51,7 +49,7 @@ export interface ResolvedWorld {
   world: WorldId;
   title: string;
   settings: Record<string, unknown>;
-  placements: Array<Placement & { sceneRef: string }>;
+  placements: Placement[];
 }
 
 // --- scene (mirrors *.scene.json) ----------------------------------------

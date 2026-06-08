@@ -10,7 +10,7 @@ import type { AppContext } from '../../core/context';
 import { CACHE_TTL, DEFAULT_VERSION } from '../../shared/constants';
 import type { CreateSceneDto, UpdateSceneDto } from '../../shared/dto';
 import type { SceneId, SceneRecord } from '../../shared/types';
-import { newId, slugify } from '../../shared/utils';
+import { base62Id } from '../../shared/utils';
 import { SceneRepository, type SceneSummary } from './scene.repository';
 
 const sceneCacheKey = (id: SceneId) => `scene:${id}`;
@@ -36,7 +36,7 @@ export class SceneService {
 
   async create(dto: CreateSceneDto): Promise<SceneRecord> {
     const scene: SceneRecord = {
-      id: dto.id ?? slugify(dto.name) ?? newId('scene'),
+      id: dto.id ?? base62Id(),
       name: dto.name,
       version: dto.version ?? DEFAULT_VERSION,
       doc: dto.doc,

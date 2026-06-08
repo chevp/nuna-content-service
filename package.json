@@ -1,0 +1,37 @@
+{
+  "name": "nuna-content-service",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Nuna content service — world/scene/entity/asset/chunk content API with realtime gateway (MariaDB + Redis).",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "optionalDependencies": {
+    "mariadb": "^3.3.0",
+    "redis": "^4.6.13",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.12.0",
+    "@types/ws": "^8.5.10",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2",
+    "tsx": "^4.11.0",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

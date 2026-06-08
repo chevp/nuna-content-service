@@ -1,0 +1,43 @@
+services:
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: nuna_content
+      MARIADB_USER: nuna
+      MARIADB_PASSWORD: nuna
+    ports:
+      - "3306:3306"
+    volumes:
+      # Applied on first boot in filename order: migrations, then seeds.
+      - ../migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
+      - ../seeds/001_initial_world.sql:/docker-entrypoint-initdb.d/100_initial_world.sql:ro
+      - ../seeds/002_forest_scene.sql:/docker-entrypoint-initdb.d/101_forest_scene.sql:ro
+      - ../seeds/003_chunks.sql:/docker-entrypoint-initdb.d/102_chunks.sql:ro
+      - mariadb-data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  content-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    depends_on:
+      - mariadb
+      - redis
+    environment:
+      PORT: 4000
+      NODE_ENV: production
+      MARIADB_HOST: mariadb
+      MARIADB_USER: nuna
+      MARIADB_PASSWORD: nuna
+      MARIADB_DATABASE: nuna_content
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+
+volumes:
+  mariadb-data:

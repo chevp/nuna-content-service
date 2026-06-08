@@ -17,8 +17,8 @@ export const asyncHandler =
 
 const BASE62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 
-/** Generate a random base62 identifier (default 12 chars ≈ 71 bits). */
-export const base62Id = (size = 12): string => {
+/** Generate a random base62 identifier (default 11 chars ≈ 65 bits). */
+export const base62Id = (size = 11): string => {
   const bytes = randomBytes(size);
   let out = '';
   for (let i = 0; i < size; i += 1) out += BASE62[bytes[i] % 62];

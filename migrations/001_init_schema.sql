@@ -2,7 +2,7 @@
 -- Composition layer: worlds compose scenes (by name, via placements), prefabs
 -- are reusable kits, sessions are runtime instances of a world. The full
 -- authored documents are stored as JSON (doc_json); the rest are derived index
--- tables. Generated ids are base62 (12 chars); id columns are VARCHAR(24) to
+-- tables. Generated ids are base62 (11 chars); id columns are VARCHAR(24) to
 -- leave headroom for caller-supplied ids.
 
 -- --- worlds (mirror world.json) -----------------------------------------

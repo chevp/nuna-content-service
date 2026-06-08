@@ -68,7 +68,7 @@ Each authored artifact is stored as its **canonical JSON document** (lossless
 round-trip with the container's files), with derived **index tables** for
 querying and gating:
 
-Generated record ids are **base62** (e.g. `7dKq2mX9aB0c`).
+Generated record ids are **base62**, 11 chars (e.g. `7dKq2mX9aB0`).
 
 ```
 worlds(id, title, version, comment, settings_json, doc_json)

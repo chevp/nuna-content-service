@@ -9,6 +9,7 @@ import type { SceneId, SceneRecord } from '../../shared/types';
 
 interface SceneRow {
   id: string;
+  tenant_id: string;
   name: string;
   version: string;
   doc_json: string;
@@ -22,6 +23,7 @@ export interface SceneSummary {
 
 const toRecord = (row: SceneRow): SceneRecord => ({
   id: row.id,
+  tenantId: row.tenant_id,
   name: row.name,
   version: row.version,
   doc: JSON.parse(row.doc_json),
@@ -37,15 +39,16 @@ export class SceneRepository {
     return rows.length ? toRecord(rows[0]) : null;
   }
 
-  async list(): Promise<SceneSummary[]> {
-    return this.db.run<SceneSummary>(
-      QueryBuilder.table('scenes').order('name').select('id, name, version'),
-    );
+  async list(tenantId?: string): Promise<SceneSummary[]> {
+    const qb = QueryBuilder.table('scenes');
+    if (tenantId) qb.where('tenant_id', tenantId);
+    return this.db.run<SceneSummary>(qb.order('name').select('id, name, version'));
   }
 
   async save(scene: SceneRecord): Promise<void> {
     const row = {
       id: scene.id,
+      tenant_id: scene.tenantId,
       name: scene.name,
       version: scene.version,
       doc_json: JSON.stringify(scene.doc),

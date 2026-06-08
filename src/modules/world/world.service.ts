@@ -1,8 +1,8 @@
 /**
  * World service — publish and resolve world compositions.
  *
- * A world composes scenes (palette + placements + settings). `resolve` applies
- * gating against effective settings to produce the active placement list the
+ * A world composes scenes (palette + placements + props). `resolve` applies
+ * gating against effective props to produce the active placement list the
  * runtime should load. Resolved results are cached.
  */
 
@@ -40,7 +40,7 @@ export class WorldService {
       title: dto.title,
       version: dto.version ?? DEFAULT_VERSION,
       comment: dto.comment,
-      settings: dto.settings ?? {},
+      props: dto.props ?? {},
       world: dto.world.map(
         (p): Placement => ({
           id: p.id ?? base62Id(),

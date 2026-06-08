@@ -40,19 +40,21 @@ export interface Placement {
  */
 export interface WorldComposition {
   id: WorldId;
+  tenantId: string;
   title: string;
   version: string;
   comment?: string;
-  settings: Record<string, unknown>;
+  /** Opaque props bag — carries Lua-evaluated gating values and any game-specific world data. */
+  props: Record<string, unknown>;
   /** Ordered placements; the `world` array in world.json. */
   world: Placement[];
 }
 
-/** Result of resolving a world against settings: the active placements only. */
+/** Result of resolving a world against props overrides: the active placements only. */
 export interface ResolvedWorld {
   world: WorldId;
   title: string;
-  settings: Record<string, unknown>;
+  props: Record<string, unknown>;
   placements: Placement[];
 }
 
@@ -72,6 +74,7 @@ export interface SceneDoc {
 
 export interface SceneRecord {
   id: SceneId;
+  tenantId: string;
   name: string;
   version: string;
   doc: SceneDoc;
@@ -87,6 +90,7 @@ export interface SceneRecord {
  */
 export interface PrefabCatalog {
   id: PrefabId;
+  tenantId: string;
   slug: string;
   name: string;
   description?: string;
@@ -109,6 +113,7 @@ export type SessionStatus = 'created' | 'starting' | 'running' | 'stopped' | 'er
  */
 export interface GameSession {
   id: SessionId;
+  tenantId: string;
   worldId: WorldId;
   status: SessionStatus;
   /** Opaque properties bag — callers own this entirely. */

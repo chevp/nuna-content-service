@@ -41,8 +41,8 @@ export function worldController(ctx: AppContext): Router {
     }),
   );
 
-  // Resolve → active placements for given settings.
-  // Settings overrides come from the JSON body (POST) or ?s=<json> (GET).
+  // Resolve → active placements for given props overrides.
+  // Props overrides come from the JSON body (POST) or ?s=<json> (GET).
   router.get(
     '/:id/resolve',
     asyncHandler(async (req, res) => {
@@ -59,7 +59,7 @@ export function worldController(ctx: AppContext): Router {
   router.post(
     '/:id/resolve',
     asyncHandler(async (req, res) => {
-      const resolved = await service.resolve(req.params.id, req.body?.settings ?? {});
+      const resolved = await service.resolve(req.params.id, req.body?.props ?? {});
       if (!resolved) {
         res.status(404).json({ error: 'world not found' });
         return;

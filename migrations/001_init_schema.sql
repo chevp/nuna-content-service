@@ -7,11 +7,13 @@
 -- --- worlds (mirror world.json) -----------------------------------------
 CREATE TABLE IF NOT EXISTS worlds (
   id            VARCHAR(11) PRIMARY KEY,
+  tenant_id     VARCHAR(11) NOT NULL DEFAULT 'default',
   title         VARCHAR(255) NOT NULL,
   version       VARCHAR(32) NOT NULL DEFAULT '1.0',
   comment       TEXT NULL,
-  settings_json JSON NOT NULL,   -- Lua-evaluated key/values
-  doc_json      JSON NOT NULL    -- full WorldComposition, lossless
+  props_json    JSON NOT NULL,   -- opaque props bag (Lua-evaluated key/values, placement gating, …)
+  doc_json      JSON NOT NULL,   -- full WorldComposition, lossless
+  INDEX idx_worlds_tenant (tenant_id)
 );
 
 -- Placements: a scene (named directly) included in the world, in order,
@@ -32,10 +34,12 @@ CREATE TABLE IF NOT EXISTS placements (
 
 -- --- scenes (mirror *.scene.json) ---------------------------------------
 CREATE TABLE IF NOT EXISTS scenes (
-  id       VARCHAR(11) PRIMARY KEY,
-  name     VARCHAR(255) NOT NULL,
-  version  VARCHAR(32) NOT NULL DEFAULT '1.0',
-  doc_json JSON NOT NULL   -- authored scene document, opaque to the service
+  id        VARCHAR(11) PRIMARY KEY,
+  tenant_id VARCHAR(11) NOT NULL DEFAULT 'default',
+  name      VARCHAR(255) NOT NULL,
+  version   VARCHAR(32) NOT NULL DEFAULT '1.0',
+  doc_json  JSON NOT NULL,   -- authored scene document, opaque to the service
+  INDEX idx_scenes_tenant (tenant_id)
 );
 
 -- --- prefab catalogs (mirror a .prefab kit) -----------------------------
@@ -45,12 +49,15 @@ CREATE TABLE IF NOT EXISTS scenes (
 -- the iris-engine concern -- so there are NO material/render columns here.
 CREATE TABLE IF NOT EXISTS prefabs (
   id              VARCHAR(11) PRIMARY KEY,
-  slug            VARCHAR(64) NOT NULL UNIQUE,
+  tenant_id       VARCHAR(11) NOT NULL DEFAULT 'default',
+  slug            VARCHAR(11) NOT NULL,
   name            VARCHAR(255) NOT NULL,
   description     TEXT NULL,
   tags_json       JSON NULL,
   kit_ref         VARCHAR(512) NULL,  -- storage reference / URI to the .prefab kit
-  preview_uri     VARCHAR(512) NULL   -- optional path to a single catalog preview image
+  preview_uri     VARCHAR(512) NULL,  -- optional path to a single catalog preview image
+  UNIQUE KEY uq_prefab_tenant_slug (tenant_id, slug),
+  INDEX idx_prefabs_tenant (tenant_id)
 );
 
 -- --- game-sessions (runtime instances of a world) -----------------------
@@ -59,11 +66,13 @@ CREATE TABLE IF NOT EXISTS prefabs (
 --             The service never interprets this; it is passed through verbatim.
 CREATE TABLE IF NOT EXISTS sessions (
   id               VARCHAR(11) PRIMARY KEY,
+  tenant_id        VARCHAR(11) NOT NULL DEFAULT 'default',
   world_id         VARCHAR(11) NOT NULL,
   status           VARCHAR(16) NOT NULL DEFAULT 'created',
   props_json       JSON        NOT NULL DEFAULT (JSON_OBJECT()),
   runtime_endpoint VARCHAR(512) NULL,
   created_at       BIGINT      NOT NULL,
+  INDEX idx_sessions_tenant (tenant_id),
   INDEX idx_sessions_world (world_id),
   CONSTRAINT fk_sessions_world FOREIGN KEY (world_id)
     REFERENCES worlds (id) ON DELETE CASCADE

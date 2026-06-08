@@ -38,6 +38,7 @@ export class SessionService {
 
     const session: GameSession = {
       id: base62Id(),
+      tenantId: dto.tenantId,
       worldId: dto.worldId,
       status: 'created',
       props: dto.props ?? {},

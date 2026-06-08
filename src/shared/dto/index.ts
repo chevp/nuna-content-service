@@ -15,10 +15,11 @@ export interface PlacementInput {
 /** Create/publish a world composition (the world.json payload). */
 export interface CreateWorldDto {
   id?: string;
+  tenantId: string;
   title: string;
   version?: string;
   comment?: string;
-  settings?: Record<string, unknown>;
+  props?: Record<string, unknown>;
   world: PlacementInput[]; // placements (each names a scene)
 }
 
@@ -28,6 +29,7 @@ export type UpdateWorldDto = Partial<Omit<CreateWorldDto, 'id'>>;
 
 export interface CreateSceneDto {
   id?: string;
+  tenantId: string;
   name: string;
   version?: string;
   doc: SceneDoc;
@@ -38,6 +40,7 @@ export type UpdateSceneDto = Partial<Omit<CreateSceneDto, 'id'>>;
 // --- prefab --------------------------------------------------------------
 
 export interface CreatePrefabDto {
+  tenantId: string;
   slug: string;
   name: string;
   description?: string;
@@ -49,6 +52,7 @@ export interface CreatePrefabDto {
 // --- session -------------------------------------------------------------
 
 export interface CreateSessionDto {
+  tenantId: string;
   worldId: string;
   /** Opaque props bag (name, gameMode, maxPlayers, players, backend, …). */
   props?: Record<string, unknown>;

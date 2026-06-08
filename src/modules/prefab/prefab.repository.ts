@@ -12,6 +12,7 @@ import type { PrefabCatalog, PrefabId } from '../../shared/types';
 
 interface PrefabRow {
   id: string;
+  tenant_id: string;
   slug: string;
   name: string;
   description: string | null;
@@ -29,10 +30,10 @@ export interface PrefabSummary {
 export class PrefabRepository {
   constructor(private readonly db: Database) {}
 
-  async list(): Promise<PrefabSummary[]> {
-    return this.db.run<PrefabSummary>(
-      QueryBuilder.table('prefabs').order('name').select('id, slug, name'),
-    );
+  async list(tenantId?: string): Promise<PrefabSummary[]> {
+    const qb = QueryBuilder.table('prefabs');
+    if (tenantId) qb.where('tenant_id', tenantId);
+    return this.db.run<PrefabSummary>(qb.order('name').select('id, slug, name'));
   }
 
   async findById(id: PrefabId): Promise<PrefabCatalog | null> {
@@ -43,6 +44,7 @@ export class PrefabRepository {
     const row = rows[0];
     return {
       id: row.id,
+      tenantId: row.tenant_id,
       slug: row.slug,
       name: row.name,
       description: row.description ?? undefined,
@@ -55,6 +57,7 @@ export class PrefabRepository {
   async save(prefab: PrefabCatalog): Promise<void> {
     const row = {
       id: prefab.id,
+      tenant_id: prefab.tenantId,
       slug: prefab.slug,
       name: prefab.name,
       description: prefab.description ?? null,

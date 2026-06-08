@@ -1,12 +1,12 @@
 /**
- * Pure world-resolution: given a world composition and an effective settings
- * map, compute the ACTIVE placements (gating applied). Each placement names its
- * scene directly. This is the "compose" step — no IO, fully testable.
+ * Pure world-resolution: given a world composition and effective props
+ * overrides, compute the ACTIVE placements (gating applied). Each placement
+ * names its scene directly. This is the "compose" step — no IO, fully testable.
  */
 
 import type { Placement, ResolvedWorld, WorldComposition } from '../../shared/types';
 
-/** Lua-ish truthiness for a setting value (settings are JSON key/values). */
+/** Lua-ish truthiness for a prop value (props are JSON key/values). */
 export function isTruthy(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === 'boolean') return value;
@@ -15,22 +15,22 @@ export function isTruthy(value: unknown): boolean {
   return Boolean(value);
 }
 
-/** Is a placement active under the given settings? Gated placements need a truthy setting. */
-export function isPlacementActive(p: Placement, settings: Record<string, unknown>): boolean {
+/** Is a placement active under the given props? Gated placements need a truthy prop. */
+export function isPlacementActive(p: Placement, props: Record<string, unknown>): boolean {
   if (!p.whenSetting) return true;
-  return isTruthy(settings[p.whenSetting]);
+  return isTruthy(props[p.whenSetting]);
 }
 
 /**
- * Resolve a world against optional per-request setting overrides. Returns only
+ * Resolve a world against optional per-request props overrides. Returns only
  * the active placements (gating applied); each names the scene it places.
  */
 export function resolveWorld(
   world: WorldComposition,
   overrides: Record<string, unknown> = {},
 ): ResolvedWorld {
-  const settings = { ...world.settings, ...overrides };
-  const placements = world.world.filter((p) => isPlacementActive(p, settings));
+  const props = { ...world.props, ...overrides };
+  const placements = world.world.filter((p) => isPlacementActive(p, props));
 
-  return { world: world.id, title: world.title, settings, placements };
+  return { world: world.id, title: world.title, props, placements };
 }

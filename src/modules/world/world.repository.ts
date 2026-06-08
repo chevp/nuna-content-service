@@ -13,10 +13,11 @@ import type { Placement, WorldComposition, WorldId } from '../../shared/types';
 
 interface WorldRow {
   id: string;
+  tenant_id: string;
   title: string;
   version: string;
   comment: string | null;
-  settings_json: string;
+  props_json: string;
   doc_json: string;
 }
 
@@ -36,19 +37,20 @@ export class WorldRepository {
     return rows.length ? (JSON.parse(rows[0].doc_json) as WorldComposition) : null;
   }
 
-  async list(): Promise<WorldSummary[]> {
-    return this.db.run<WorldSummary>(
-      QueryBuilder.table('worlds').order('title').select('id, title, version'),
-    );
+  async list(tenantId?: string): Promise<WorldSummary[]> {
+    const qb = QueryBuilder.table('worlds');
+    if (tenantId) qb.where('tenant_id', tenantId);
+    return this.db.run<WorldSummary>(qb.order('title').select('id, title, version'));
   }
 
   async save(world: WorldComposition): Promise<void> {
     const row = {
       id: world.id,
+      tenant_id: world.tenantId,
       title: world.title,
       version: world.version,
       comment: world.comment ?? null,
-      settings_json: JSON.stringify(world.settings ?? {}),
+      props_json: JSON.stringify(world.props ?? {}),
       doc_json: JSON.stringify(world),
     };
     const existing = await this.db.run<WorldRow>(

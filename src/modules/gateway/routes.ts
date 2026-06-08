@@ -7,9 +7,9 @@
 import { Router } from 'express';
 import type { AppContext } from '../../core/context';
 import { ROUTES } from '../../shared/constants';
-import { assetController } from '../asset/asset.controller';
-import { entityController } from '../entity/entity.controller';
+import { prefabController } from '../prefab/prefab.controller';
 import { sceneController } from '../scene/scene.controller';
+import { sessionController } from '../session/session.controller';
 import { worldController } from '../world/world.controller';
 import { auth, requestLogger } from './middleware';
 
@@ -24,8 +24,8 @@ export function gatewayRouter(ctx: AppContext): Router {
 
   router.use(ROUTES.world, worldController(ctx));
   router.use(ROUTES.scene, sceneController(ctx));
-  router.use(ROUTES.entity, entityController(ctx));
-  router.use(ROUTES.asset, assetController(ctx));
+  router.use(ROUTES.prefab, prefabController(ctx));
+  router.use(ROUTES.session, sessionController(ctx));
 
   return router;
 }

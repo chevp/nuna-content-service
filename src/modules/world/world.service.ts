@@ -1,59 +1,90 @@
 /**
- * World service — the module kern.
+ * World service — publish and resolve world compositions.
  *
- * Sits at the top of the data flow (Gateway → World → Entity/Scene/Chunk →
- * Cache → DB). It owns world state and chunk mapping, and exposes entity CRUD
- * by delegating to the entity and chunk services. Clients talk to the world;
- * the world coordinates the rest.
+ * A world composes scenes (palette + placements + settings). `resolve` applies
+ * gating against effective settings to produce the active placement list the
+ * runtime should load. Resolved results are cached.
  */
 
 import type { AppContext } from '../../core/context';
-import type { CreateEntityDto, UpdateEntityDto } from '../../shared/dto';
-import type { Entity, EntityId, WorldId, WorldState } from '../../shared/types';
-import { ChunkService } from '../chunk/chunk.service';
-import { EntityService } from '../entity/entity.service';
-import { WorldRepository } from './world.repository';
+import { CACHE_TTL, DEFAULT_VERSION } from '../../shared/constants';
+import type { CreateWorldDto, UpdateWorldDto } from '../../shared/dto';
+import type { Placement, ResolvedWorld, WorldComposition, WorldId } from '../../shared/types';
+import { newId, slugify } from '../../shared/utils';
+import { WorldRepository, type WorldSummary } from './world.repository';
+import { resolveWorld } from './world.resolve';
+
+const resolvedKey = (id: WorldId, overrides: Record<string, unknown>) =>
+  `world:${id}:${JSON.stringify(overrides)}`;
 
 export class WorldService {
   private readonly repo: WorldRepository;
-  private readonly entities: EntityService;
-  private readonly chunks: ChunkService;
 
   constructor(private readonly ctx: AppContext) {
     this.repo = new WorldRepository(ctx.db);
-    this.entities = new EntityService(ctx);
-    this.chunks = new ChunkService(ctx);
   }
 
-  // --- world state -------------------------------------------------------
-  async getState(id: WorldId): Promise<WorldState | null> {
+  list(): Promise<WorldSummary[]> {
+    return this.repo.list();
+  }
+
+  get(id: WorldId): Promise<WorldComposition | null> {
     return this.repo.findById(id);
   }
 
-  async ensureWorld(id: WorldId, name: string): Promise<void> {
-    await this.repo.upsert({ id, name });
+  /** Create or replace a world composition (publish world.json). */
+  async publish(dto: CreateWorldDto): Promise<WorldComposition> {
+    const id = dto.id ?? slugify(dto.title) ?? newId('world');
+    const world: WorldComposition = {
+      id,
+      title: dto.title,
+      version: dto.version ?? DEFAULT_VERSION,
+      comment: dto.comment,
+      settings: dto.settings ?? {},
+      scenes: dto.scenes,
+      world: dto.world.map(
+        (p): Placement => ({
+          id: p.id ?? newId('plc'),
+          scene: p.scene,
+          position: p.position,
+          rotation: p.rotation,
+          scale: p.scale,
+          whenSetting: p.whenSetting,
+        }),
+      ),
+    };
+    await this.repo.save(world);
+    await this.ctx.cache.world.invalidatePrefix(`world:${id}:`);
+    await this.ctx.eventBus.emit({ type: 'world.published', worldId: id });
+    return world;
   }
 
-  // --- chunk mapping / streaming ----------------------------------------
-  /** Stream the world around a position (chunk-based partitioning). */
-  async stream(x: number, z: number, radius = 1): Promise<Entity[]> {
-    return this.chunks.streamAround(x, z, radius);
+  async update(id: WorldId, dto: UpdateWorldDto): Promise<WorldComposition | null> {
+    const current = await this.repo.findById(id);
+    if (!current) return null;
+    return this.publish({ ...current, ...dto, id });
   }
 
-  // --- entity CRUD façade ------------------------------------------------
-  getEntity(id: EntityId): Promise<Entity | null> {
-    return this.entities.get(id);
+  async delete(id: WorldId): Promise<boolean> {
+    const ok = await this.repo.delete(id);
+    if (ok) await this.ctx.cache.world.invalidatePrefix(`world:${id}:`);
+    return ok;
   }
 
-  createEntity(dto: CreateEntityDto): Promise<Entity> {
-    return this.entities.create(dto);
-  }
+  /** Resolve a world against per-request setting overrides (cache-first). */
+  async resolve(
+    id: WorldId,
+    overrides: Record<string, unknown> = {},
+  ): Promise<ResolvedWorld | null> {
+    const key = resolvedKey(id, overrides);
+    const cached = await this.ctx.cache.world.get<ResolvedWorld>(key);
+    if (cached) return cached;
 
-  updateEntity(id: EntityId, dto: UpdateEntityDto): Promise<Entity | null> {
-    return this.entities.update(id, dto);
-  }
+    const world = await this.repo.findById(id);
+    if (!world) return null;
 
-  deleteEntity(id: EntityId): Promise<boolean> {
-    return this.entities.delete(id);
+    const resolved = resolveWorld(world, overrides);
+    await this.ctx.cache.world.set(key, resolved, CACHE_TTL.world);
+    return resolved;
   }
 }

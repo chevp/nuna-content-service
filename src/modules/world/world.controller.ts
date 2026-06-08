@@ -1,10 +1,11 @@
 /**
- * World HTTP controller — world state and chunk streaming. Entity mutations
- * live under the entity controller; world exposes the read/stream surface.
+ * World HTTP controller — publish/list/fetch worlds and resolve them
+ * (palette + placements + gating) for a runtime.
  */
 
 import { Router } from 'express';
 import type { AppContext } from '../../core/context';
+import type { CreateWorldDto, UpdateWorldDto } from '../../shared/dto';
 import { asyncHandler } from '../../shared/utils';
 import { WorldService } from './world.service';
 
@@ -13,26 +14,77 @@ export function worldController(ctx: AppContext): Router {
   const service = new WorldService(ctx);
 
   router.get(
-    '/:id/state',
-    asyncHandler(async (req, res) => {
-      const state = await service.getState(req.params.id);
-      if (!state) {
-        res.status(404).json({ error: 'world not found' });
-        return;
-      }
-      res.json(state);
+    '/',
+    asyncHandler(async (_req, res) => {
+      res.json(await service.list());
     }),
   );
 
-  // Stream entities around a world position: /world/:id/stream?x=&z=&radius=
-  router.get(
-    '/:id/stream',
+  // Publish a world composition (world.json).
+  router.post(
+    '/',
     asyncHandler(async (req, res) => {
-      const x = Number(req.query.x ?? 0);
-      const z = Number(req.query.z ?? 0);
-      const radius = Number(req.query.radius ?? 1);
-      const entities = await service.stream(x, z, radius);
-      res.json({ count: entities.length, entities });
+      const world = await service.publish(req.body as CreateWorldDto);
+      res.status(201).json(world);
+    }),
+  );
+
+  router.get(
+    '/:id',
+    asyncHandler(async (req, res) => {
+      const world = await service.get(req.params.id);
+      if (!world) {
+        res.status(404).json({ error: 'world not found' });
+        return;
+      }
+      res.json(world);
+    }),
+  );
+
+  // Resolve → active placements for given settings.
+  // Settings overrides come from the JSON body (POST) or ?s=<json> (GET).
+  router.get(
+    '/:id/resolve',
+    asyncHandler(async (req, res) => {
+      const overrides = req.query.s ? (JSON.parse(String(req.query.s)) as Record<string, unknown>) : {};
+      const resolved = await service.resolve(req.params.id, overrides);
+      if (!resolved) {
+        res.status(404).json({ error: 'world not found' });
+        return;
+      }
+      res.json(resolved);
+    }),
+  );
+
+  router.post(
+    '/:id/resolve',
+    asyncHandler(async (req, res) => {
+      const resolved = await service.resolve(req.params.id, req.body?.settings ?? {});
+      if (!resolved) {
+        res.status(404).json({ error: 'world not found' });
+        return;
+      }
+      res.json(resolved);
+    }),
+  );
+
+  router.patch(
+    '/:id',
+    asyncHandler(async (req, res) => {
+      const world = await service.update(req.params.id, req.body as UpdateWorldDto);
+      if (!world) {
+        res.status(404).json({ error: 'world not found' });
+        return;
+      }
+      res.json(world);
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    asyncHandler(async (req, res) => {
+      const ok = await service.delete(req.params.id);
+      res.status(ok ? 204 : 404).end();
     }),
   );
 

@@ -1,8 +1,8 @@
-/** Scene HTTP controller — define scenes and evaluate them to entity sets. */
+/** Scene HTTP controller — CRUD over authored scene documents. */
 
 import { Router } from 'express';
 import type { AppContext } from '../../core/context';
-import type { CreateSceneDto } from '../../shared/dto';
+import type { CreateSceneDto, UpdateSceneDto } from '../../shared/dto';
 import { asyncHandler } from '../../shared/utils';
 import { SceneService } from './scene.service';
 
@@ -10,34 +10,50 @@ export function sceneController(ctx: AppContext): Router {
   const router = Router();
   const service = new SceneService(ctx);
 
-  // Create a scene definition.
+  router.get(
+    '/',
+    asyncHandler(async (_req, res) => {
+      res.json(await service.list());
+    }),
+  );
+
   router.post(
     '/',
     asyncHandler(async (req, res) => {
-      const def = await service.createDefinition(req.body as CreateSceneDto);
-      res.status(201).json(def);
+      const scene = await service.create(req.body as CreateSceneDto);
+      res.status(201).json(scene);
     }),
   );
 
-  // Evaluate a scene → entities + assets (e.g. GET /scene/forest).
   router.get(
     '/:id',
     asyncHandler(async (req, res) => {
-      const result = await service.evaluate(req.params.id);
-      if (!result) {
+      const scene = await service.get(req.params.id);
+      if (!scene) {
         res.status(404).json({ error: 'scene not found' });
         return;
       }
-      res.json(result);
+      res.json(scene);
     }),
   );
 
-  // Update scene membership (rules).
   router.patch(
-    '/:id/membership',
+    '/:id',
     asyncHandler(async (req, res) => {
-      const ok = await service.updateMembership(req.params.id, req.body?.rules);
-      res.status(ok ? 200 : 404).json({ updated: ok });
+      const scene = await service.update(req.params.id, req.body as UpdateSceneDto);
+      if (!scene) {
+        res.status(404).json({ error: 'scene not found' });
+        return;
+      }
+      res.json(scene);
+    }),
+  );
+
+  router.delete(
+    '/:id',
+    asyncHandler(async (req, res) => {
+      const ok = await service.delete(req.params.id);
+      res.status(ok ? 204 : 404).end();
     }),
   );
 

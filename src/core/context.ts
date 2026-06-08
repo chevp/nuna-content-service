@@ -17,10 +17,10 @@ export interface AppContext {
   db: Database;
   eventBus: EventBus;
   storage: StorageClient;
-  /** Three logical cache domains share one backing store, separated by prefix. */
+  /** Cache domains for the composition layer; share one backing store. */
   cache: {
-    chunk: Cache;
+    world: Cache;
     scene: Cache;
-    entity: Cache;
+    prefab: Cache;
   };
 }

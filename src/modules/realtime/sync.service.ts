@@ -1,10 +1,11 @@
 /**
- * Sync service — bridges domain events to live clients.
+ * Sync service — bridges composition events to live clients.
  *
- * Subscribes to the event bus and pushes diffs over the WebSocket gateway:
- *   entity.updated → entity diff   scene.changed → scene invalidation
- *   chunk.loaded   → chunk hint
- * This closes the runtime-editing loop (mutate → event → realtime push).
+ * Subscribes to the event bus and pushes updates over the WebSocket gateway so
+ * running game-sessions and editors react to content changes:
+ *   world.published        → world palette/placements changed
+ *   scene.updated          → an authored scene changed
+ *   session.statusChanged  → a session moved (created/starting/running/…)
  */
 
 import type { AppContext } from '../../core/context';
@@ -21,22 +22,22 @@ export class SyncService {
 
   start(): void {
     this.unsubscribers.push(
-      this.ctx.eventBus.on('entity.updated', (e) => {
+      this.ctx.eventBus.on('world.published', (e) => {
         this.gateway.broadcast({
-          channel: `chunk:${e.chunkX}:${e.chunkY}`,
-          payload: { type: 'entity.updated', entityId: e.entityId },
+          channel: `world:${e.worldId}`,
+          payload: { type: 'world.published', worldId: e.worldId },
         });
       }),
-      this.ctx.eventBus.on('entity.deleted', (e) => {
-        this.gateway.broadcast({
-          channel: 'world',
-          payload: { type: 'entity.deleted', entityId: e.entityId },
-        });
-      }),
-      this.ctx.eventBus.on('scene.changed', (e) => {
+      this.ctx.eventBus.on('scene.updated', (e) => {
         this.gateway.broadcast({
           channel: `scene:${e.sceneId}`,
-          payload: { type: 'scene.changed', sceneId: e.sceneId },
+          payload: { type: 'scene.updated', sceneId: e.sceneId },
+        });
+      }),
+      this.ctx.eventBus.on('session.statusChanged', (e) => {
+        this.gateway.broadcast({
+          channel: `session:${e.sessionId}`,
+          payload: { type: 'session.statusChanged', sessionId: e.sessionId, status: e.status },
         });
       }),
     );

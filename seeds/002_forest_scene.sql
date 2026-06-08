@@ -1,30 +1,19 @@
--- 002_forest_scene — a "forest" scene plus the trees it selects.
--- The scene is a chunk-based QUERY over chunks (2,2) and (2,3); it is not a
--- stored copy of those entities. Trees live in chunk-space x=128..191 (chunk 2),
--- z=128..191 (chunk 2) and z=192..255 (chunk 3).
+-- 002_forest_scene — a "forest" authored scene and a small world that places
+-- it twice (a clearing variant gated behind a setting).
 
-INSERT IGNORE INTO assets (id, kind, uri, material_refs) VALUES
-  ('mat_bark', 'material', 'materials/bark.json', NULL),
-  ('mat_leaf', 'material', 'materials/leaf.json', NULL),
-  ('mesh_tree', 'gltf',    'meshes/tree.gltf',    '["mat_bark","mat_leaf"]');
+INSERT IGNORE INTO scenes (id, name, version, doc_json) VALUES
+  ('forest', 'Forest', '1.0',
+   '{"version":"1.0","scene":{"id":"forest","metadata":{"name":"Forest"},"entities":[]}}');
 
--- Scene definition: chunk-based filter, limited to 100 entities.
-INSERT IGNORE INTO scenes (id, name, filter_json, rules_json) VALUES
-  ('scene_forest', 'forest',
-   '{"kind":"chunk","chunks":[{"chunkX":2,"chunkY":2},{"chunkX":2,"chunkY":3}]}',
-   '[{"op":"limit","value":100}]');
+INSERT IGNORE INTO worlds (id, title, version, comment, settings_json, doc_json) VALUES
+  ('forest-demo', 'Forest Demo', '1.0', 'Two placements of the forest scene',
+   '{"game.clearing": true}',
+   '{"version":"1.0","id":"forest-demo","title":"Forest Demo","settings":{"game.clearing":true},"scenes":{"forest":"forest"},"world":[{"id":"plc_f1","scene":"forest","position":[0,0,0]},{"id":"plc_f2","scene":"forest","position":[128,0,0],"rotation":[0,90,0],"whenSetting":"game.clearing"}]}');
 
--- Trees the forest scene resolves to.
-INSERT IGNORE INTO entities (id, type, pos_x, pos_y, pos_z, mesh_id, chunk_x, chunk_y) VALUES
-  ('ent_tree_1', 'tree', 130, 0, 140, 'mesh_tree', 2, 2),
-  ('ent_tree_2', 'tree', 150, 0, 150, 'mesh_tree', 2, 2),
-  ('ent_tree_3', 'tree', 168, 0, 132, 'mesh_tree', 2, 2),
-  ('ent_tree_4', 'tree', 140, 0, 200, 'mesh_tree', 2, 3),
-  ('ent_tree_5', 'tree', 160, 0, 230, 'mesh_tree', 2, 3);
+INSERT IGNORE INTO world_scenes (world_id, scene_key, scene_ref) VALUES
+  ('forest-demo', 'forest', 'forest');
 
-INSERT IGNORE INTO entity_components (entity_id, component_type, data_json) VALUES
-  ('ent_tree_1', 'tag', '{"value":"forest"}'),
-  ('ent_tree_2', 'tag', '{"value":"forest"}'),
-  ('ent_tree_3', 'tag', '{"value":"forest"}'),
-  ('ent_tree_4', 'tag', '{"value":"forest"}'),
-  ('ent_tree_5', 'tag', '{"value":"forest"}');
+INSERT IGNORE INTO placements
+  (id, world_id, ordinal, scene_key, pos_x, pos_y, pos_z, rot_x, rot_y, rot_z, when_setting) VALUES
+  ('plc_f1', 'forest-demo', 1, 'forest',   0, 0, 0, NULL, NULL, NULL, NULL),
+  ('plc_f2', 'forest-demo', 2, 'forest', 128, 0, 0, 0,    90,   0,    'game.clearing');

@@ -17,7 +17,7 @@ async function testContext(): Promise<AppContext> {
     db,
     eventBus,
     storage: createStorage(config.storage),
-    cache: { chunk: cache, scene: cache, entity: cache },
+    cache: { world: cache, scene: cache, prefab: cache },
   };
 }
 

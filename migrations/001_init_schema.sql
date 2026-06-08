@@ -1,46 +1,99 @@
 -- 001_init_schema — canonical DDL for nuna-content-service.
--- Flat, chunk-partitioned world model. Scenes are queries, not stored copies.
+-- Composition layer: worlds compose scenes (palette + placements), prefabs are
+-- reusable kits, sessions are runtime instances of a world. The full authored
+-- documents are stored as JSON (doc_json); the rest are derived index tables.
 
+-- --- worlds (mirror world.json) -----------------------------------------
 CREATE TABLE IF NOT EXISTS worlds (
-  id   VARCHAR(64) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL
+  id            VARCHAR(96) PRIMARY KEY,
+  title         VARCHAR(255) NOT NULL,
+  version       VARCHAR(32) NOT NULL DEFAULT '1.0',
+  comment       TEXT NULL,
+  settings_json JSON NOT NULL,   -- Lua-evaluated key/values
+  doc_json      JSON NOT NULL    -- full WorldComposition, lossless
 );
 
-CREATE TABLE IF NOT EXISTS entities (
-  id       VARCHAR(64) PRIMARY KEY,
-  type     VARCHAR(64) NOT NULL,
-  pos_x    DOUBLE NOT NULL DEFAULT 0,
-  pos_y    DOUBLE NOT NULL DEFAULT 0,
-  pos_z    DOUBLE NOT NULL DEFAULT 0,
-  mesh_id  VARCHAR(64) NULL,
-  chunk_x  INT NOT NULL,
-  chunk_y  INT NOT NULL,
-  INDEX idx_entities_chunk (chunk_x, chunk_y),
-  INDEX idx_entities_type (type)
+-- Scene palette: stable key -> scene reference (scene id or relative path).
+CREATE TABLE IF NOT EXISTS world_scenes (
+  world_id  VARCHAR(96) NOT NULL,
+  scene_key VARCHAR(96) NOT NULL,
+  scene_ref VARCHAR(512) NOT NULL,
+  PRIMARY KEY (world_id, scene_key),
+  CONSTRAINT fk_world_scenes_world FOREIGN KEY (world_id)
+    REFERENCES worlds (id) ON DELETE CASCADE
 );
 
--- Render-only components, stored as JSON keyed by entity + type.
-CREATE TABLE IF NOT EXISTS entity_components (
-  entity_id      VARCHAR(64) NOT NULL,
-  component_type VARCHAR(64) NOT NULL,
-  data_json      JSON NOT NULL,
-  PRIMARY KEY (entity_id, component_type),
-  CONSTRAINT fk_components_entity FOREIGN KEY (entity_id)
-    REFERENCES entities (id) ON DELETE CASCADE
+-- Placements: a scene from the palette positioned into the world, optionally
+-- gated behind a setting.
+CREATE TABLE IF NOT EXISTS placements (
+  id           VARCHAR(96) PRIMARY KEY,
+  world_id     VARCHAR(96) NOT NULL,
+  ordinal      INT NOT NULL,
+  scene_key    VARCHAR(96) NOT NULL,
+  pos_x        DOUBLE NULL,
+  pos_y        DOUBLE NULL,
+  pos_z        DOUBLE NULL,
+  rot_x        DOUBLE NULL,
+  rot_y        DOUBLE NULL,
+  rot_z        DOUBLE NULL,
+  scale_x      DOUBLE NULL,
+  scale_y      DOUBLE NULL,
+  scale_z      DOUBLE NULL,
+  when_setting VARCHAR(128) NULL,
+  INDEX idx_placements_world (world_id),
+  CONSTRAINT fk_placements_world FOREIGN KEY (world_id)
+    REFERENCES worlds (id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS assets (
-  id            VARCHAR(64) PRIMARY KEY,
-  kind          VARCHAR(32) NOT NULL,
-  uri           VARCHAR(1024) NOT NULL,
-  material_refs JSON NULL
-);
-
--- Scene DEFINITIONS only (filter + rules). Results are computed at runtime
--- and live in the cache, never persisted here.
+-- --- scenes (mirror *.scene.json) ---------------------------------------
 CREATE TABLE IF NOT EXISTS scenes (
-  id          VARCHAR(64) PRIMARY KEY,
+  id       VARCHAR(96) PRIMARY KEY,
+  name     VARCHAR(255) NOT NULL,
+  version  VARCHAR(32) NOT NULL DEFAULT '1.0',
+  doc_json JSON NOT NULL   -- authored scene document, opaque to the service
+);
+
+-- --- prefab catalogs (mirror a .prefab kit) -----------------------------
+CREATE TABLE IF NOT EXISTS prefabs (
+  id          VARCHAR(96) PRIMARY KEY,
+  slug        VARCHAR(96) NOT NULL UNIQUE,
   name        VARCHAR(255) NOT NULL,
-  filter_json JSON NOT NULL,
-  rules_json  JSON NULL
+  description TEXT NULL,
+  tags_json   JSON NULL,
+  kit_ref     VARCHAR(512) NULL   -- storage reference to the .prefab kit blob
+);
+
+CREATE TABLE IF NOT EXISTS prefab_materials (
+  prefab_id              VARCHAR(96) NOT NULL,
+  material_id            INT NOT NULL,
+  name                   VARCHAR(255) NOT NULL,
+  metallic_factor        DOUBLE NULL,
+  roughness_factor       DOUBLE NULL,
+  base_color_factor_json JSON NULL,
+  PRIMARY KEY (prefab_id, material_id),
+  CONSTRAINT fk_prefab_materials FOREIGN KEY (prefab_id)
+    REFERENCES prefabs (id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS prefab_previews (
+  prefab_id     VARCHAR(96) NOT NULL,
+  material_id   INT NULL,
+  camera_preset VARCHAR(64) NOT NULL,
+  jpeg_ref      VARCHAR(512) NULL,   -- storage reference to the cached frame
+  INDEX idx_prefab_previews (prefab_id),
+  CONSTRAINT fk_prefab_previews FOREIGN KEY (prefab_id)
+    REFERENCES prefabs (id) ON DELETE CASCADE
+);
+
+-- --- game-sessions (runtime instances of a world) -----------------------
+CREATE TABLE IF NOT EXISTS sessions (
+  id               VARCHAR(96) PRIMARY KEY,
+  world_id         VARCHAR(96) NOT NULL,
+  status           VARCHAR(16) NOT NULL DEFAULT 'created',
+  settings_json    JSON NOT NULL,
+  runtime_endpoint VARCHAR(512) NULL,
+  created_at       BIGINT NOT NULL,
+  INDEX idx_sessions_world (world_id),
+  CONSTRAINT fk_sessions_world FOREIGN KEY (world_id)
+    REFERENCES worlds (id) ON DELETE CASCADE
 );

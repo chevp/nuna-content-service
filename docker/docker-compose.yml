@@ -13,7 +13,7 @@ services:
       - ../migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
       - ../seeds/001_initial_world.sql:/docker-entrypoint-initdb.d/100_initial_world.sql:ro
       - ../seeds/002_forest_scene.sql:/docker-entrypoint-initdb.d/101_forest_scene.sql:ro
-      - ../seeds/003_chunks.sql:/docker-entrypoint-initdb.d/102_chunks.sql:ro
+      - ../seeds/003_prefabs.sql:/docker-entrypoint-initdb.d/102_prefabs.sql:ro
       - mariadb-data:/var/lib/mysql
 
   redis:

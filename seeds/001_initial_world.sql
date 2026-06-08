@@ -1,25 +1,27 @@
--- 001_initial_world — base world, core assets, and the spawn area (chunk 0,0).
--- chunk = floor(pos / 64). Everything here sits in chunk (0,0).
+-- 001_initial_world — two authored scenes and the "overworld" composition.
+-- The world composes the scenes via a palette + placements; the garden
+-- placement is gated behind the setting `game.show_garden`.
 
-INSERT IGNORE INTO worlds (id, name) VALUES
-  ('overworld', 'Overworld');
+-- Authored scenes (doc_json is the engine-defined scene body; kept minimal).
+INSERT IGNORE INTO scenes (id, name, version, doc_json) VALUES
+  ('main', 'Main', '1.0',
+   '{"version":"1.0","scene":{"id":"main","metadata":{"name":"Main"},"entities":[]}}'),
+  ('garden', 'Garden', '1.0',
+   '{"version":"1.0","scene":{"id":"garden","metadata":{"name":"Garden"},"entities":[]}}');
 
--- Core assets (mesh + materials). material_refs is a JSON array of asset ids.
-INSERT IGNORE INTO assets (id, kind, uri, material_refs) VALUES
-  ('mat_skin',    'material', 'materials/skin.json',   NULL),
-  ('mat_grass',   'material', 'materials/grass.json',  NULL),
-  ('mat_stone',   'material', 'materials/stone.json',  NULL),
-  ('mesh_player', 'gltf',     'meshes/player.gltf',    '["mat_skin"]'),
-  ('mesh_ground', 'mesh',     'meshes/ground.gltf',    '["mat_grass"]'),
-  ('mesh_rock',   'mesh',     'meshes/rock.gltf',      '["mat_stone"]');
+-- World composition.
+INSERT IGNORE INTO worlds (id, title, version, comment, settings_json, doc_json) VALUES
+  ('overworld', 'Overworld', '1.0', 'Starter world',
+   '{"game.show_garden": false}',
+   '{"version":"1.0","id":"overworld","title":"Overworld","comment":"Starter world","settings":{"game.show_garden":false},"scenes":{"main":"main","garden":"garden"},"world":[{"id":"plc_main","scene":"main","position":[0,0,0]},{"id":"plc_garden","scene":"garden","position":[20,0,0],"whenSetting":"game.show_garden"}]}');
 
--- Spawn-area entities, all in chunk (0,0).
-INSERT IGNORE INTO entities (id, type, pos_x, pos_y, pos_z, mesh_id, chunk_x, chunk_y) VALUES
-  ('ent_player', 'player', 10, 0, 10, 'mesh_player', 0, 0),
-  ('ent_ground', 'ground', 32, 0, 32, 'mesh_ground', 0, 0),
-  ('ent_rock_1', 'prop',   40, 0, 12, 'mesh_rock',   0, 0);
+-- Derived palette index.
+INSERT IGNORE INTO world_scenes (world_id, scene_key, scene_ref) VALUES
+  ('overworld', 'main', 'main'),
+  ('overworld', 'garden', 'garden');
 
--- Render-only components.
-INSERT IGNORE INTO entity_components (entity_id, component_type, data_json) VALUES
-  ('ent_player', 'tag',       '{"value":"spawn"}'),
-  ('ent_player', 'transform', '{"rotationY":0,"scale":1}');
+-- Derived placement index.
+INSERT IGNORE INTO placements
+  (id, world_id, ordinal, scene_key, pos_x, pos_y, pos_z, when_setting) VALUES
+  ('plc_main',   'overworld', 1, 'main',    0, 0, 0, NULL),
+  ('plc_garden', 'overworld', 2, 'garden', 20, 0, 0, 'game.show_garden');

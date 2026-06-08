@@ -4,7 +4,8 @@ Ordered, append-only schema migrations. Apply in filename order; never edit a
 migration that has shipped — add a new one.
 
 ```
-001_init_schema.sql   tables: worlds, entities, entity_components, assets, scenes
+001_init_schema.sql   tables: worlds, world_scenes, placements, scenes,
+                              prefabs, prefab_materials, prefab_previews, sessions
 ```
 
 `seeds/` (sibling directory) populates a development dataset and runs **after**

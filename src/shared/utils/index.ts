@@ -18,4 +18,10 @@ let counter = 0;
 /** Deterministic-ish id (no Date.now/random dependency at import time). */
 export const newId = (prefix = 'id'): string => `${prefix}_${(counter += 1).toString(36)}`;
 
-export const chunkKey = (chunkX: number, chunkY: number): string => `${chunkX}:${chunkY}`;
+/** Slugify a name into a stable, url-safe key. */
+export const slugify = (s: string): string =>
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');

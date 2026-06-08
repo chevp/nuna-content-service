@@ -1,97 +1,72 @@
 /**
- * Scene service — manage scene definitions and evaluate them to entity sets.
+ * Scene service — store and serve authored scene documents.
  *
- * Definitions are persisted (filter + rules); evaluated results are cached
- * runtime-only. Flow for `GET /scene/:id`: load definition → build entity set
- * → resolve assets → cache → return.
+ * A scene is an authored unit (entities + lights + materials), stored as an
+ * opaque document and referenced by worlds through their palette. The service
+ * does not interpret scene internals — that is the engine's job.
  */
 
 import type { AppContext } from '../../core/context';
-import { QueryBuilder } from '../../core/db/mariadb';
-import { CACHE_TTL } from '../../shared/constants';
-import type { CreateSceneDto } from '../../shared/dto';
-import type { Asset, SceneDefinition, SceneId, SceneResult } from '../../shared/types';
-import { newId } from '../../shared/utils';
-import { AssetService } from '../asset/asset.service';
-import { EntityRepository } from '../entity/entity.repository';
-import { buildScene } from './scene.builder';
-
-interface SceneRow {
-  id: string;
-  name: string;
-  filter_json: string;
-  rules_json: string | null;
-}
+import { CACHE_TTL, DEFAULT_VERSION } from '../../shared/constants';
+import type { CreateSceneDto, UpdateSceneDto } from '../../shared/dto';
+import type { SceneId, SceneRecord } from '../../shared/types';
+import { newId, slugify } from '../../shared/utils';
+import { SceneRepository, type SceneSummary } from './scene.repository';
 
 const sceneCacheKey = (id: SceneId) => `scene:${id}`;
 
 export class SceneService {
-  private readonly repo: EntityRepository;
-  private readonly assets: AssetService;
+  private readonly repo: SceneRepository;
 
   constructor(private readonly ctx: AppContext) {
-    this.repo = new EntityRepository(ctx.db);
-    this.assets = new AssetService(ctx);
+    this.repo = new SceneRepository(ctx.db);
   }
 
-  async createDefinition(dto: CreateSceneDto): Promise<SceneDefinition> {
-    const def: SceneDefinition = {
-      id: newId('scene'),
-      name: dto.name,
-      filter: dto.filter,
-      rules: dto.rules,
-    };
-    await this.ctx.db.exec(
-      QueryBuilder.table('scenes').insert({
-        id: def.id,
-        name: def.name,
-        filter_json: JSON.stringify(def.filter),
-        rules_json: def.rules ? JSON.stringify(def.rules) : null,
-      }),
-    );
-    return def;
+  list(): Promise<SceneSummary[]> {
+    return this.repo.list();
   }
 
-  async getDefinition(id: SceneId): Promise<SceneDefinition | null> {
-    const rows = await this.ctx.db.run<SceneRow>(
-      QueryBuilder.table('scenes').where('id', id).limit(1).select(),
-    );
-    if (rows.length === 0) return null;
-    const row = rows[0];
-    return {
-      id: row.id,
-      name: row.name,
-      filter: JSON.parse(row.filter_json),
-      rules: row.rules_json ? JSON.parse(row.rules_json) : undefined,
-    };
-  }
-
-  /** Evaluate a scene to its entity set + resolved assets (cache-first). */
-  async evaluate(id: SceneId): Promise<SceneResult | null> {
-    const cached = await this.ctx.cache.scene.get<SceneResult>(sceneCacheKey(id));
+  async get(id: SceneId): Promise<SceneRecord | null> {
+    const cached = await this.ctx.cache.scene.get<SceneRecord>(sceneCacheKey(id));
     if (cached) return cached;
-
-    const def = await this.getDefinition(id);
-    if (!def) return null;
-
-    const entities = await buildScene(def, { repo: this.repo });
-    const meshIds = [...new Set(entities.map((e) => e.meshId).filter((m): m is string => !!m))];
-    const assets: Asset[] = await this.assets.getMany(meshIds);
-
-    const result: SceneResult = { scene: id, entities, assets, computedAt: 0 };
-    await this.ctx.cache.scene.set(sceneCacheKey(id), result, CACHE_TTL.scene);
-    return result;
+    const scene = await this.repo.findById(id);
+    if (scene) await this.ctx.cache.scene.set(sceneCacheKey(id), scene, CACHE_TTL.scene);
+    return scene;
   }
 
-  /** Update a scene's membership rules and invalidate its cached result. */
-  async updateMembership(id: SceneId, rules: SceneDefinition['rules']): Promise<boolean> {
-    const affected = await this.ctx.db.exec(
-      QueryBuilder.table('scenes')
-        .where('id', id)
-        .update({ rules_json: rules ? JSON.stringify(rules) : null }),
-    );
-    await this.ctx.cache.scene.del(sceneCacheKey(id));
-    await this.ctx.eventBus.emit({ type: 'scene.changed', sceneId: id });
-    return affected > 0;
+  async create(dto: CreateSceneDto): Promise<SceneRecord> {
+    const scene: SceneRecord = {
+      id: dto.id ?? slugify(dto.name) ?? newId('scene'),
+      name: dto.name,
+      version: dto.version ?? DEFAULT_VERSION,
+      doc: dto.doc,
+    };
+    await this.save(scene);
+    return scene;
+  }
+
+  async update(id: SceneId, dto: UpdateSceneDto): Promise<SceneRecord | null> {
+    const current = await this.repo.findById(id);
+    if (!current) return null;
+    const next: SceneRecord = {
+      id,
+      name: dto.name ?? current.name,
+      version: dto.version ?? current.version,
+      doc: dto.doc ?? current.doc,
+    };
+    await this.save(next);
+    return next;
+  }
+
+  async delete(id: SceneId): Promise<boolean> {
+    const ok = await this.repo.delete(id);
+    if (ok) await this.ctx.cache.scene.del(sceneCacheKey(id));
+    return ok;
+  }
+
+  private async save(scene: SceneRecord): Promise<void> {
+    await this.repo.save(scene);
+    await this.ctx.cache.scene.del(sceneCacheKey(scene.id));
+    await this.ctx.eventBus.emit({ type: 'scene.updated', sceneId: scene.id });
   }
 }

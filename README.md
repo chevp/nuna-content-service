@@ -1,45 +1,58 @@
 # nuna-content-service
 
-Content service for the Nuna world platform. It owns **world content** — a flat,
-chunk-partitioned set of entities — and serves it to clients as worlds, scenes,
-entities, assets and streamed chunks, with an optional realtime gateway for live
-updates.
+Content service for the Nuna world platform. It owns the **composition layer**:
+it composes **scenes**, **worlds**, **prefabs** and **game-sessions** — and
+references scenes/prefabs by id. It deliberately does **not** deal with
+individual entities, meshes, materials or coordinates — that is the iris engine
+/ in-editor concern (the worldgraph).
+
+Shapes mirror the container's `world.json`, `*.scene.json` and `.prefab`
+catalogs so documents round-trip losslessly.
 
 Backed by **MariaDB** (persistence) and **Redis** (cache / pub-sub).
 
 ## Architecture
 
 ```
-Client
+Client / container
   ↓
-Gateway          routing · auth check · request forwarding
+Gateway          routing · auth check
   ↓
-World Module     the kern — world state, chunk mapping, entity façade
+World ─ resolves a composition (palette + placements + gating) for a runtime
+  ├─ Scene    authored scene documents (referenced by the world palette)
+  ├─ Prefab   reusable .prefab catalogs (templates · materials · previews)
+  └─ Session  game-session registry (runtime instances of a world)
   ↓
-Entity / Scene / Chunk Modules
-  ↓
-Cache Layer      chunk · scene · entity caches
+Cache Layer      world · scene · prefab caches
   ↓
 MariaDB
 ```
 
+### The four composition nouns
+
+| Noun         | What it is                                                                                  |
+|--------------|---------------------------------------------------------------------------------------------|
+| **prefab**   | A reusable `.prefab` kit: templates + materials + preview slots. Referenced by id; the kit blob lives in storage (`kitRef`). |
+| **scene**    | An authored `*.scene.json` unit (entities/lights/materials). Stored as an opaque document, referenced by worlds. |
+| **world**    | A composition: a scene **palette** (`scenes: {key → ref}`) + ordered **placements** (a scene key + position/rotation/scale + optional `whenSetting` gate) + settings. Mirrors `world.json`. |
+| **game-session** | A runtime instance of a world. This service is the **registry** (world ref, status, settings overrides, runtime endpoint); the runtime itself is owned by iris-player / the relay daemon. |
+
 ### Modules (`src/modules/`)
 
-| Module     | Responsibility                                                            |
-|------------|---------------------------------------------------------------------------|
-| `gateway`  | `routes.ts` + `middleware.ts` — routing, auth check, internal forwarding.  |
-| `world`    | Kern. Entity CRUD façade, world state, chunk mapping, persistence calls.   |
-| `scene`    | Scenes are **queries** (filter + rules), evaluated → entity sets, cached.  |
-| `entity`   | Create/update/delete entities, render-only components, transform updates. |
-| `asset`    | Mesh lookup, material refs, file paths (gltf/bin).                         |
-| `chunk`    | Spatial indexing, world partitioning, streaming logic.                    |
-| `realtime` | (optional) WebSocket connections, live updates, scene diff push.          |
+| Module     | Files                                             | Responsibility                                  |
+|------------|---------------------------------------------------|-------------------------------------------------|
+| `gateway`  | `routes.ts`, `middleware.ts`                       | Routing, auth check.                            |
+| `world`    | `world.{service,controller,repository}.ts`, `world.resolve.ts` | Publish + resolve world compositions (gating).  |
+| `scene`    | `scene.{service,controller,repository}.ts`        | CRUD over authored scene documents.             |
+| `prefab`   | `prefab.{service,controller,repository}.ts`       | Register/serve prefab catalogs.                 |
+| `session`  | `session.{service,controller,repository}.ts`      | Game-session registry + status lifecycle.       |
+| `realtime` | `ws.gateway.ts`, `sync.service.ts`                | (optional) push world/scene/session updates.    |
 
 ### Core (`src/core/`)
 
 - `db/` — `mariadb.ts` connection + `query-builder.ts`.
 - `cache/` — `memory-cache.ts` (hot tier) + `redis-cache.ts` (shared tier).
-- `events/` — `event-bus.ts`: `entity.updated`, `scene.changed`, `chunk.loaded`.
+- `events/` — `event-bus.ts`: `world.published`, `scene.updated`, `prefab.registered`, `session.statusChanged`.
 - `auth/` — bearer-token verification used by the gateway.
 - `config/` — environment-driven configuration.
 
@@ -49,62 +62,73 @@ Concrete driver adapters (`mariadb`, `redis`, `storage`). Each lazily loads its
 driver and falls back to an in-memory stub, so the service runs end-to-end with
 no external dependencies during development.
 
-## The scene concept
+## Persistence: canonical doc + index tables
 
-A scene is **not** a stored copy of the world. It is a definition:
-
-```ts
-Scene = {
-  filter: chunk-based | tag-based | entity-list,
-  rules?: SceneRule[],
-  // computed result: runtime only (cache), never persisted
-}
-```
-
-`GET /scene/:id` loads the definition → builds the entity set → resolves assets
-→ caches → returns.
-
-## Entity model
+Each authored artifact is stored as its **canonical JSON document** (lossless
+round-trip with the container's files), with derived **index tables** for
+querying and gating:
 
 ```
-entities                 entity_components (optional, render-only)
---------                 -----------------
-id                       entity_id
-type                     component_type
-pos_x, pos_y, pos_z      data_json
-mesh_id
-chunk_x, chunk_y
+worlds(id, title, version, comment, settings_json, doc_json)
+  world_scenes(world_id, scene_key, scene_ref)        -- palette index
+  placements(id, world_id, ordinal, scene_key,        -- placement index
+             pos_*, rot_*, scale_*, when_setting)
+scenes(id, name, version, doc_json)
+prefabs(id, slug, name, description, tags_json, kit_ref)
+  prefab_materials(prefab_id, material_id, ...)
+  prefab_previews(prefab_id, material_id, camera_preset, jpeg_ref)
+sessions(id, world_id, status, settings_json, runtime_endpoint, created_at)
 ```
 
-## Performance: three caches
+## World resolution (the compose step)
 
-1. **Chunk cache** — loaded world sections.
-2. **Scene cache** — computed entity sets.
-3. **Entity cache** — hot entities.
-
-## Runtime editing flow
+A world is resolved against effective settings to produce the **active**
+placements a runtime should load. Gated placements (`whenSetting`) are dropped
+unless their setting is truthy; each surviving placement is annotated with the
+palette `sceneRef`:
 
 ```
-Client → POST /entity → Entity Service → DB update
-       → event: entity.updated → cache invalidation → realtime push (optional)
+POST /world/overworld/resolve   { "settings": { "game.show_garden": true } }
+→ { world, title, settings, placements: [ { id, scene, sceneRef, position, … } ] }
 ```
+
+The resolve logic is pure (`world.resolve.ts`) and unit-tested.
 
 ## HTTP surface
 
-| Method | Path                       | Description                          |
-|--------|----------------------------|--------------------------------------|
-| GET    | `/health`                  | Liveness.                            |
-| GET    | `/world/:id/state`         | World header.                        |
-| GET    | `/world/:id/stream?x&z&radius` | Stream chunks around a position. |
-| POST   | `/entity`                  | Create entity.                       |
-| GET    | `/entity/:id`              | Fetch entity.                        |
-| PATCH  | `/entity/:id`              | Update entity (transform/components).|
-| DELETE | `/entity/:id`              | Delete entity.                       |
-| POST   | `/scene`                   | Create scene definition.             |
-| GET    | `/scene/:id`               | Evaluate scene → entities + assets.  |
-| PATCH  | `/scene/:id/membership`    | Update scene rules.                  |
-| GET    | `/asset/:id`               | Asset metadata.                      |
-| GET    | `/asset/:id/mesh`          | Mesh + resolved materials.           |
+| Method | Path                  | Description                                        |
+|--------|-----------------------|----------------------------------------------------|
+| GET    | `/health`             | Liveness.                                          |
+| GET    | `/world`              | List worlds.                                       |
+| POST   | `/world`              | Publish a world composition (world.json).          |
+| GET    | `/world/:id`          | Full world composition.                            |
+| GET/POST | `/world/:id/resolve` | Resolve → active placements (settings via `?s=` or body). |
+| PATCH  | `/world/:id`          | Update a world.                                    |
+| DELETE | `/world/:id`          | Delete a world.                                    |
+| GET    | `/scene`              | List scenes.                                       |
+| POST   | `/scene`              | Create a scene document.                           |
+| GET    | `/scene/:id`          | Fetch a scene document.                            |
+| PATCH/DELETE | `/scene/:id`    | Update / delete a scene.                           |
+| GET    | `/prefab`             | List prefab catalogs.                              |
+| POST   | `/prefab`             | Register a prefab catalog.                         |
+| GET    | `/prefab/:id`         | Catalog + materials + resolved preview refs.       |
+| DELETE | `/prefab/:id`         | Delete a prefab.                                   |
+| GET    | `/session`            | List game-sessions.                                |
+| POST   | `/session`            | Create a session for a world.                      |
+| GET    | `/session/:id`        | Fetch a session.                                   |
+| PATCH  | `/session/:id`        | Drive status / settings / runtime endpoint.        |
+| DELETE | `/session/:id`        | Stop + remove the session record.                  |
+
+## Publish / session flow
+
+```
+container → POST /world (publish composition)
+          → event: world.published → cache invalidation → realtime push
+
+container → POST /session {worldId} → session registry record (status=created)
+          → PATCH /session/:id {status:"running", runtimeEndpoint}
+          → event: session.statusChanged → realtime push to subscribers
+```
 
 ## Develop
 
@@ -129,3 +153,26 @@ docker compose -f docker/docker-compose.yml up --build
 Brings up MariaDB (migrations then seeds auto-applied on first boot from
 `migrations/` and `seeds/`), Redis, and the service on `:4000`.
 
+## Migrations & seeds
+
+- `migrations/001_init_schema.sql` — canonical composition schema.
+- `seeds/` — development dataset:
+  - `001_initial_world.sql` — two scenes + the `overworld` composition (with a gated garden placement).
+  - `002_forest_scene.sql` — a `forest` scene + a small world that places it twice.
+  - `003_prefabs.sql` — a `tree` prefab catalog + a sample game-session.
+
+## Layout
+
+```
+src/
+  app.ts            express app factory
+  main.ts           bootstrap (config → db/redis/storage → app → realtime)
+  modules/          gateway · world · scene · prefab · session · realtime
+  core/             db · cache · events · auth · config
+  shared/           types · dto · utils · constants
+  infrastructure/   mariadb · redis · storage
+migrations/         ordered schema DDL
+seeds/              development dataset (initial world · forest scene · prefabs)
+tests/
+docker/
+```

@@ -38,7 +38,7 @@ async function buildContext(): Promise<AppContext> {
     db,
     storage,
     eventBus,
-    cache: { chunk: backing, scene: backing, entity: backing },
+    cache: { world: backing, scene: backing, prefab: backing },
   };
 }
 

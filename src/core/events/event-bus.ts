@@ -1,19 +1,21 @@
 /**
  * In-process event bus.
  *
- * The spine of the runtime-editing flow: a mutation emits an event, caches
- * invalidate, and the realtime module pushes diffs. Domain events include
- * `entity.updated`, `scene.changed`, `chunk.loaded`.
+ * The spine of the publish flow: a composition mutation emits an event, caches
+ * invalidate, and the realtime module pushes updates to live sessions. Domain
+ * events are composition-level: `world.published`, `scene.updated`,
+ * `prefab.registered`, `session.statusChanged`.
  */
 
 import { logger } from '../../shared/utils';
+import type { SessionStatus } from '../../shared/types';
 
 export type DomainEvent =
-  | { type: 'entity.created'; entityId: string }
-  | { type: 'entity.updated'; entityId: string; chunkX: number; chunkY: number }
-  | { type: 'entity.deleted'; entityId: string }
-  | { type: 'scene.changed'; sceneId: string }
-  | { type: 'chunk.loaded'; chunkX: number; chunkY: number };
+  | { type: 'world.published'; worldId: string }
+  | { type: 'scene.updated'; sceneId: string }
+  | { type: 'prefab.registered'; prefabId: string }
+  | { type: 'session.created'; sessionId: string; worldId: string }
+  | { type: 'session.statusChanged'; sessionId: string; status: SessionStatus };
 
 export type EventType = DomainEvent['type'];
 type Handler<E extends DomainEvent = DomainEvent> = (event: E) => void | Promise<void>;

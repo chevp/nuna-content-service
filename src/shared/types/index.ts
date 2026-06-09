@@ -29,7 +29,7 @@ export interface Placement {
   id: string;
   scene: string; // scene name, referenced directly (no palette key)
   /** When set, the placement is only active if the named setting is truthy. */
-  whenSetting?: string;
+  whenProp?: string;
   /** Game-specific placement data, opaque to the service (e.g. a transform). */
   params?: Record<string, unknown>;
 }

@@ -17,8 +17,8 @@ export function isTruthy(value: unknown): boolean {
 
 /** Is a placement active under the given props? Gated placements need a truthy prop. */
 export function isPlacementActive(p: Placement, props: Record<string, unknown>): boolean {
-  if (!p.whenSetting) return true;
-  return isTruthy(props[p.whenSetting]);
+  if (!p.whenProp) return true;
+  return isTruthy(props[p.whenProp]);
 }
 
 /**

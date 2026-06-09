@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS placements (
   world_id     VARCHAR(11) NOT NULL,
   ordinal      INT NOT NULL,
   scene_name   VARCHAR(255) NOT NULL,
-  when_setting VARCHAR(128) NULL,
+  when_prop    VARCHAR(128) NULL,
   params_json  JSON NULL,   -- game-specific placement data, opaque to the service
   INDEX idx_placements_world (world_id),
   CONSTRAINT fk_placements_world FOREIGN KEY (world_id)

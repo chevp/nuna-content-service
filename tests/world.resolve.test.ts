@@ -4,17 +4,18 @@ import type { WorldComposition } from '../src/shared/types';
 
 const world: WorldComposition = {
   id: 'overworld',
+  tenantId: 'default',
   title: 'Overworld',
   version: '1.0',
-  settings: { 'game.show_garden': false },
+  props: { 'game.show_garden': false },
   world: [
     { id: 'plc_main', scene: 'Main' },
-    { id: 'plc_garden', scene: 'Garden', whenSetting: 'game.show_garden' },
+    { id: 'plc_garden', scene: 'Garden', whenProp: 'game.show_garden' },
   ],
 };
 
 describe('isTruthy', () => {
-  it('treats falsey settings (false/0/""/"false") as gates off', () => {
+  it('treats falsey props (false/0/""/"false") as gates off', () => {
     for (const v of [false, 0, '', 'false', '0', null, undefined]) {
       expect(isTruthy(v)).toBe(false);
     }
@@ -27,12 +28,12 @@ describe('isTruthy', () => {
 });
 
 describe('resolveWorld', () => {
-  it('drops gated placements when the setting is off', () => {
+  it('drops gated placements when the prop is off', () => {
     const r = resolveWorld(world);
     expect(r.placements.map((p) => p.id)).toEqual(['plc_main']);
   });
 
-  it('includes gated placements when an override turns the setting on', () => {
+  it('includes gated placements when an override turns the prop on', () => {
     const r = resolveWorld(world, { 'game.show_garden': true });
     expect(r.placements.map((p) => p.id)).toEqual(['plc_main', 'plc_garden']);
     // placements name their scene directly

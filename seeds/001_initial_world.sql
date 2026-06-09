@@ -16,19 +16,19 @@ INSERT IGNORE INTO scenes (id, tenant_id, name, version, doc_json) VALUES
 INSERT IGNORE INTO worlds (id, tenant_id, title, version, comment, props_json, doc_json) VALUES
   ('overworld', 'default', 'Overworld', '1.0', 'Starter world',
    '{"game.show_garden": false}',
-   '{"version":"1.0","id":"overworld","tenantId":"default","title":"Overworld","comment":"Starter world","props":{"game.show_garden":false},"world":[{"id":"plc_main","scene":"Main"},{"id":"plc_garden","scene":"Garden","whenSetting":"game.show_garden"}]}');
+   '{"version":"1.0","id":"overworld","tenantId":"default","title":"Overworld","comment":"Starter world","props":{"game.show_garden":false},"world":[{"id":"plc_main","scene":"Main"},{"id":"plc_garden","scene":"Garden","whenProp":"game.show_garden"}]}');
 
 -- Forest Demo: same scene placed twice; second placement gated and carries a
 -- game-specific transform in params_json (opaque to the service).
 INSERT IGNORE INTO worlds (id, tenant_id, title, version, comment, props_json, doc_json) VALUES
   ('forest-demo', 'default', 'Forest Demo', '1.0', 'Two placements of the forest scene',
    '{"game.clearing": true}',
-   '{"version":"1.0","id":"forest-demo","tenantId":"default","title":"Forest Demo","props":{"game.clearing":true},"world":[{"id":"plc_f1","scene":"Forest"},{"id":"plc_f2","scene":"Forest","whenSetting":"game.clearing","params":{"transform":{"position":[128,0,0],"rotation":[0,90,0]}}}]}');
+   '{"version":"1.0","id":"forest-demo","tenantId":"default","title":"Forest Demo","props":{"game.clearing":true},"world":[{"id":"plc_f1","scene":"Forest"},{"id":"plc_f2","scene":"Forest","whenProp":"game.clearing","params":{"transform":{"position":[128,0,0],"rotation":[0,90,0]}}}]}');
 
 -- --- placements -------------------------------------------------------------
 
 INSERT IGNORE INTO placements
-  (id, world_id, ordinal, scene_name, when_setting, params_json) VALUES
+  (id, world_id, ordinal, scene_name, when_prop, params_json) VALUES
   ('plc_main',   'overworld',   1, 'Main',   NULL,               NULL),
   ('plc_garden', 'overworld',   2, 'Garden', 'game.show_garden', NULL),
   ('plc_f1',     'forest-demo', 1, 'Forest', NULL,               NULL),

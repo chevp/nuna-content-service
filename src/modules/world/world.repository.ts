@@ -83,7 +83,7 @@ export class WorldRepository {
           world_id: world.id,
           ordinal: (ordinal += 1),
           scene_name: p.scene,
-          when_setting: p.whenSetting ?? null,
+          when_prop: p.whenProp ?? null,
           params_json: p.params ? JSON.stringify(p.params) : null,
         }),
       );

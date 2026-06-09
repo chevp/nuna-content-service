@@ -7,7 +7,7 @@ import type { Placement, SceneDoc, SessionStatus } from '../types';
 export interface PlacementInput {
   id?: string;
   scene: string; // scene name
-  whenSetting?: string;
+  whenProp?: string;
   /** Game-specific placement data, opaque to the service. */
   params?: Record<string, unknown>;
 }

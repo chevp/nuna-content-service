@@ -34,7 +34,7 @@ MariaDB
 |--------------|---------------------------------------------------------------------------------------------|
 | **prefab**   | A reusable `.prefab` kit, referenced by id via `kitRef` (a URI to a `.prefab` SQLite / zip / local asset). The kit's interior (meshes, materials, ...) is opaque to this service — that's the iris-engine concern. The catalog row carries only metadata + an optional `previewUri`. |
 | **scene**    | An authored `*.scene.json` unit (entities/lights/materials). Stored as an opaque document, referenced by worlds. |
-| **world**    | A composition: ordered **placements** (each names a scene + optional `whenSetting` gate + opaque game `params`) + settings. Scenes are referenced **by name** directly — no palette key. There is **no transform**: how a scene maps into a world is game-specific and lives in `params`. Mirrors `world.json`. |
+| **world**    | A composition: ordered **placements** (each names a scene + optional `whenProp` gate + opaque game `params`) + settings. Scenes are referenced **by name** directly — no palette key. There is **no transform**: how a scene maps into a world is game-specific and lives in `params`. Mirrors `world.json`. |
 | **game-session** | A runtime instance of a world. This service is the **registry** (world ref, status, settings overrides, runtime endpoint); the runtime itself is owned by iris-player / the relay daemon. |
 
 ### Modules (`src/modules/`)
@@ -73,7 +73,7 @@ Generated record ids are **base62**, 11 chars (e.g. `7dKq2mX9aB0`).
 ```
 worlds(id, title, version, comment, settings_json, doc_json)
   placements(id, world_id, ordinal, scene_name,       -- placement index
-             when_setting, params_json)               -- params_json: opaque game data
+             when_prop, params_json)               -- params_json: opaque game data
 scenes(id, name, version, doc_json)
 prefabs(id, slug, name, description, tags_json, kit_ref, preview_uri)
 sessions(id, world_id, status, settings_json, runtime_endpoint, created_at)
@@ -82,12 +82,12 @@ sessions(id, world_id, status, settings_json, runtime_endpoint, created_at)
 ## World resolution (the compose step)
 
 A world is resolved against effective settings to produce the **active**
-placements a runtime should load. Gated placements (`whenSetting`) are dropped
+placements a runtime should load. Gated placements (`whenProp`) are dropped
 unless their setting is truthy; each surviving placement names its scene:
 
 ```
-POST /world/overworld/resolve   { "settings": { "game.show_garden": true } }
-→ { world, title, settings, placements: [ { id, scene, whenSetting?, params? } ] }
+POST /world/overworld/resolve   { "props": { "game.show_garden": true } }
+→ { world, title, props, placements: [ { id, scene, whenProp?, params? } ] }
 ```
 
 The resolve logic is pure (`world.resolve.ts`) and unit-tested.

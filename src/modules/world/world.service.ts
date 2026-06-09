@@ -45,7 +45,7 @@ export class WorldService {
         (p): Placement => ({
           id: p.id ?? base62Id(),
           scene: p.scene,
-          whenSetting: p.whenSetting,
+          whenProp: p.whenProp,
           params: p.params,
         }),
       ),

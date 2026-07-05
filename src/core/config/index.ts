@@ -3,12 +3,9 @@
 export interface AppConfig {
   port: number;
   env: 'development' | 'production' | 'test';
-  mariadb: {
-    host: string;
-    port: number;
-    user: string;
-    password: string;
-    database: string;
+  kaga: {
+    url: string;
+    apiKey: string;
   };
   redis: {
     host: string;
@@ -31,12 +28,9 @@ const num = (v: string | undefined, fallback: number): number =>
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): AppConfig => ({
   port: num(env.PORT, 4000),
   env: (env.NODE_ENV as AppConfig['env']) ?? 'development',
-  mariadb: {
-    host: env.MARIADB_HOST ?? 'localhost',
-    port: num(env.MARIADB_PORT, 3306),
-    user: env.MARIADB_USER ?? 'nuna',
-    password: env.MARIADB_PASSWORD ?? 'nuna',
-    database: env.MARIADB_DATABASE ?? 'nuna_content',
+  kaga: {
+    url: env.KAGA_URL ?? 'http://localhost:8090',
+    apiKey: env.KAGA_API_KEY ?? 'dev-key',
   },
   redis: {
     host: env.REDIS_HOST ?? 'localhost',

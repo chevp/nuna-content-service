@@ -1,19 +1,12 @@
 /**
- * Scene persistence — canonical scene document (`*.scene.json`) stored as
- * `doc_json`, with name/version indexed for listing.
+ * Scene persistence via kaga (kind='scene').
+ *
+ * The full SceneRecord (including the opaque scene document) is stored in the
+ * node payload. kaga assigns the node id, which becomes the domain SceneId.
  */
 
-import type { Database } from '../../core/db/mariadb';
-import { QueryBuilder } from '../../core/db/mariadb';
+import type { KagaClient } from '../../core/kaga/kaga-client';
 import type { SceneId, SceneRecord } from '../../shared/types';
-
-interface SceneRow {
-  id: string;
-  tenant_id: string;
-  name: string;
-  version: string;
-  doc_json: string;
-}
 
 export interface SceneSummary {
   id: string;
@@ -21,51 +14,41 @@ export interface SceneSummary {
   version: string;
 }
 
-const toRecord = (row: SceneRow): SceneRecord => ({
-  id: row.id,
-  tenantId: row.tenant_id,
-  name: row.name,
-  version: row.version,
-  doc: JSON.parse(row.doc_json),
-});
-
 export class SceneRepository {
-  constructor(private readonly db: Database) {}
+  constructor(private readonly kaga: KagaClient) {}
 
   async findById(id: SceneId): Promise<SceneRecord | null> {
-    const rows = await this.db.run<SceneRow>(
-      QueryBuilder.table('scenes').where('id', id).limit(1).select(),
-    );
-    return rows.length ? toRecord(rows[0]) : null;
+    const node = await this.kaga.getNode(id);
+    if (!node) return null;
+    const scene = node.payload as unknown as SceneRecord;
+    return { ...scene, id: node.id };
   }
 
-  async list(tenantId?: string): Promise<SceneSummary[]> {
-    const qb = QueryBuilder.table('scenes');
-    if (tenantId) qb.where('tenant_id', tenantId);
-    return this.db.run<SceneSummary>(qb.order('name').select('id, name, version'));
+  async list(): Promise<SceneSummary[]> {
+    const nodes = await this.kaga.listNodes('scene');
+    return nodes.map((n) => ({
+      id: n.id,
+      name: n.label,
+      version: typeof n.payload['version'] === 'string' ? n.payload['version'] : '1.0',
+    }));
   }
 
-  async save(scene: SceneRecord): Promise<void> {
-    const row = {
-      id: scene.id,
-      tenant_id: scene.tenantId,
-      name: scene.name,
-      version: scene.version,
-      doc_json: JSON.stringify(scene.doc),
+  /** Save a scene. For new scenes (empty id) kaga assigns the id; returns the saved entity. */
+  async save(scene: SceneRecord): Promise<SceneRecord> {
+    const input = {
+      kind: 'scene',
+      label: scene.name,
+      payload: scene as unknown as Record<string, unknown>,
     };
-    const existing = await this.db.run<SceneRow>(
-      QueryBuilder.table('scenes').where('id', scene.id).limit(1).select('id'),
-    );
-    if (existing.length) {
-      const { id, ...rest } = row;
-      await this.db.exec(QueryBuilder.table('scenes').where('id', id).update({ ...rest }));
-    } else {
-      await this.db.exec(QueryBuilder.table('scenes').insert({ ...row }));
+    if (scene.id) {
+      await this.kaga.updateNode(scene.id, input);
+      return scene;
     }
+    const node = await this.kaga.createNode(input);
+    return { ...scene, id: node.id };
   }
 
   async delete(id: SceneId): Promise<boolean> {
-    const affected = await this.db.exec(QueryBuilder.table('scenes').where('id', id).delete());
-    return affected > 0;
+    return this.kaga.deleteNode(id);
   }
 }

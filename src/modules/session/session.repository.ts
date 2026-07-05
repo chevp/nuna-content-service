@@ -1,74 +1,45 @@
-/** Game-session persistence. A session is a runtime instance record. */
+/** Game-session persistence via kaga (kind='session'). */
 
-import type { Database } from '../../core/db/mariadb';
-import { QueryBuilder } from '../../core/db/mariadb';
-import type { GameSession, SessionId, SessionStatus } from '../../shared/types';
-
-interface SessionRow {
-  id: string;
-  tenant_id: string;
-  world_id: string;
-  status: SessionStatus;
-  props_json: string;
-  runtime_endpoint: string | null;
-  created_at: number;
-}
-
-const toSession = (row: SessionRow): GameSession => ({
-  id: row.id,
-  tenantId: row.tenant_id,
-  worldId: row.world_id,
-  status: row.status,
-  props: JSON.parse(row.props_json),
-  runtimeEndpoint: row.runtime_endpoint ?? undefined,
-  createdAt: row.created_at,
-});
+import type { KagaClient } from '../../core/kaga/kaga-client';
+import type { GameSession, SessionId } from '../../shared/types';
 
 export class SessionRepository {
-  constructor(private readonly db: Database) {}
+  constructor(private readonly kaga: KagaClient) {}
 
   async findById(id: SessionId): Promise<GameSession | null> {
-    const rows = await this.db.run<SessionRow>(
-      QueryBuilder.table('sessions').where('id', id).limit(1).select(),
-    );
-    return rows.length ? toSession(rows[0]) : null;
+    const node = await this.kaga.getNode(id);
+    if (!node) return null;
+    const session = node.payload as unknown as GameSession;
+    return { ...session, id: node.id };
   }
 
-  async list(tenantId?: string): Promise<GameSession[]> {
-    const qb = QueryBuilder.table('sessions');
-    if (tenantId) qb.where('tenant_id', tenantId);
-    const rows = await this.db.run<SessionRow>(qb.order('created_at DESC').select());
-    return rows.map(toSession);
+  async list(): Promise<GameSession[]> {
+    const nodes = await this.kaga.listNodes('session');
+    return nodes.map((n) => {
+      const session = n.payload as unknown as GameSession;
+      return { ...session, id: n.id };
+    });
   }
 
-  async insert(session: GameSession): Promise<void> {
-    await this.db.exec(
-      QueryBuilder.table('sessions').insert({
-        id: session.id,
-        tenant_id: session.tenantId,
-        world_id: session.worldId,
-        status: session.status,
-        props_json: JSON.stringify(session.props),
-        runtime_endpoint: session.runtimeEndpoint ?? null,
-        created_at: session.createdAt,
-      }),
-    );
+  /** Create a new session; kaga assigns the id. Returns the saved session. */
+  async insert(session: GameSession): Promise<GameSession> {
+    const node = await this.kaga.createNode({
+      kind: 'session',
+      label: session.worldId,
+      payload: session as unknown as Record<string, unknown>,
+    });
+    return { ...session, id: node.id };
   }
 
   async update(session: GameSession): Promise<void> {
-    await this.db.exec(
-      QueryBuilder.table('sessions')
-        .where('id', session.id)
-        .update({
-          status: session.status,
-          props_json: JSON.stringify(session.props),
-          runtime_endpoint: session.runtimeEndpoint ?? null,
-        }),
-    );
+    await this.kaga.updateNode(session.id, {
+      kind: 'session',
+      label: session.worldId,
+      payload: session as unknown as Record<string, unknown>,
+    });
   }
 
   async delete(id: SessionId): Promise<boolean> {
-    const affected = await this.db.exec(QueryBuilder.table('sessions').where('id', id).delete());
-    return affected > 0;
+    return this.kaga.deleteNode(id);
   }
 }

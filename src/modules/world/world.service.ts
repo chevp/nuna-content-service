@@ -1,9 +1,9 @@
 /**
  * World service — publish and resolve world compositions.
  *
- * A world composes scenes (palette + placements + props). `resolve` applies
- * gating against effective props to produce the active placement list the
- * runtime should load. Resolved results are cached.
+ * A world composes scenes (placements + props). `resolve` applies gating
+ * against effective props to produce the active placement list the runtime
+ * should load. Resolved results are cached.
  */
 
 import type { AppContext } from '../../core/context';
@@ -21,7 +21,7 @@ export class WorldService {
   private readonly repo: WorldRepository;
 
   constructor(private readonly ctx: AppContext) {
-    this.repo = new WorldRepository(ctx.db);
+    this.repo = new WorldRepository(ctx.kaga);
   }
 
   list(): Promise<WorldSummary[]> {
@@ -34,9 +34,8 @@ export class WorldService {
 
   /** Create or replace a world composition (publish world.json). */
   async publish(dto: CreateWorldDto): Promise<WorldComposition> {
-    const id = dto.id ?? base62Id();
     const world: WorldComposition = {
-      id,
+      id: dto.id ?? '', // empty = new; kaga assigns the id on create
       tenantId: dto.tenantId,
       title: dto.title,
       version: dto.version ?? DEFAULT_VERSION,
@@ -44,17 +43,17 @@ export class WorldService {
       props: dto.props ?? {},
       world: dto.world.map(
         (p): Placement => ({
-          id: p.id ?? base62Id(),
+          id: p.id ?? base62Id(), // placement ids are local — not kaga nodes
           scene: p.scene,
           whenProp: p.whenProp,
           params: p.params,
         }),
       ),
     };
-    await this.repo.save(world);
-    await this.ctx.cache.world.invalidatePrefix(`world:${id}:`);
-    await this.ctx.eventBus.emit({ type: 'world.published', worldId: id });
-    return world;
+    const saved = await this.repo.save(world);
+    await this.ctx.cache.world.invalidatePrefix(`world:${saved.id}:`);
+    await this.ctx.eventBus.emit({ type: 'world.published', worldId: saved.id });
+    return saved;
   }
 
   async update(id: WorldId, dto: UpdateWorldDto): Promise<WorldComposition | null> {

@@ -2,7 +2,7 @@
  * Bootstrap entrypoint.
  *
  * Wiring order:
- *   config → db + redis + storage → caches → event bus → AppContext
+ *   config → kaga + redis + storage → caches → event bus → AppContext
  *   → express app → http server → realtime (ws gateway + sync service)
  */
 
@@ -12,7 +12,7 @@ import { MemoryCache, type Cache } from './core/cache/memory-cache';
 import { RedisCache } from './core/cache/redis-cache';
 import { loadConfig } from './core/config';
 import type { AppContext } from './core/context';
-import { Database } from './core/db/mariadb';
+import { KagaClient } from './core/kaga/kaga-client';
 import { eventBus } from './core/events/event-bus';
 import { createRedis } from './infrastructure/redis';
 import { createStorage } from './infrastructure/storage';
@@ -22,10 +22,9 @@ import { logger } from './shared/utils';
 
 async function buildContext(): Promise<AppContext> {
   const config = loadConfig();
-  const db = await Database.connect(config.mariadb);
+  const kaga = new KagaClient(config.kaga);
   const storage = createStorage(config.storage);
 
-  // Shared store for all three cache domains: Redis when available, else memory.
   let backing: Cache;
   if (config.redis.url && config.env !== 'test') {
     backing = new RedisCache(await createRedis(config.redis));
@@ -35,7 +34,7 @@ async function buildContext(): Promise<AppContext> {
 
   return {
     config,
-    db,
+    kaga,
     storage,
     eventBus,
     cache: { world: backing, scene: backing, prefab: backing },
@@ -47,7 +46,6 @@ async function main(): Promise<void> {
   const app = createApp(ctx);
   const server = createServer(app);
 
-  // Realtime (optional): attach ws gateway and wire it to domain events.
   const gateway = new WsGateway();
   await gateway.attach(server);
   new SyncService(ctx, gateway).start();
@@ -60,7 +58,7 @@ async function main(): Promise<void> {
 
   const shutdown = () => {
     logger.info('shutting down');
-    server.close(() => ctx.db.close().then(() => process.exit(0)));
+    server.close(() => process.exit(0));
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

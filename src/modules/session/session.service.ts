@@ -10,7 +10,6 @@
 import type { AppContext } from '../../core/context';
 import type { CreateSessionDto, UpdateSessionDto } from '../../shared/dto';
 import type { GameSession, SessionDescriptor, SessionId, SessionStatus } from '../../shared/types';
-import { base62Id } from '../../shared/utils';
 import { WorldRepository } from '../world/world.repository';
 import { SessionRepository } from './session.repository';
 
@@ -19,8 +18,8 @@ export class SessionService {
   private readonly worlds: WorldRepository;
 
   constructor(private readonly ctx: AppContext) {
-    this.repo = new SessionRepository(ctx.db);
-    this.worlds = new WorldRepository(ctx.db);
+    this.repo = new SessionRepository(ctx.kaga);
+    this.worlds = new WorldRepository(ctx.kaga);
   }
 
   list(): Promise<GameSession[]> {
@@ -37,20 +36,20 @@ export class SessionService {
     if (!world) return null;
 
     const session: GameSession = {
-      id: base62Id(),
+      id: '', // kaga assigns the id on create
       tenantId: dto.tenantId,
       worldId: dto.worldId,
       status: 'created',
       props: dto.props ?? {},
       createdAt: Date.now(),
     };
-    await this.repo.insert(session);
+    const saved = await this.repo.insert(session);
     await this.ctx.eventBus.emit({
       type: 'session.created',
-      sessionId: session.id,
-      worldId: session.worldId,
+      sessionId: saved.id,
+      worldId: saved.worldId,
     });
-    return session;
+    return saved;
   }
 
   async update(id: SessionId, dto: UpdateSessionDto): Promise<GameSession | null> {

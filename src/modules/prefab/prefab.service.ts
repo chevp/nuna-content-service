@@ -10,7 +10,7 @@ import type { AppContext } from '../../core/context';
 import { CACHE_TTL } from '../../shared/constants';
 import type { CreatePrefabDto } from '../../shared/dto';
 import type { PrefabCatalog, PrefabId } from '../../shared/types';
-import { base62Id, slugify } from '../../shared/utils';
+import { slugify } from '../../shared/utils';
 import { PrefabRepository, type PrefabSummary } from './prefab.repository';
 
 const prefabCacheKey = (id: PrefabId) => `prefab:${id}`;
@@ -19,7 +19,7 @@ export class PrefabService {
   private readonly repo: PrefabRepository;
 
   constructor(private readonly ctx: AppContext) {
-    this.repo = new PrefabRepository(ctx.db);
+    this.repo = new PrefabRepository(ctx.kaga);
   }
 
   list(): Promise<PrefabSummary[]> {
@@ -33,7 +33,6 @@ export class PrefabService {
     const prefab = await this.repo.findById(id);
     if (!prefab) return null;
 
-    // Resolve storage references for the kit + the optional preview image.
     const resolved: PrefabCatalog = {
       ...prefab,
       kitRef: prefab.kitRef ? this.ctx.storage.resolve(prefab.kitRef) : undefined,
@@ -45,7 +44,7 @@ export class PrefabService {
 
   async register(dto: CreatePrefabDto): Promise<PrefabCatalog> {
     const prefab: PrefabCatalog = {
-      id: base62Id(),
+      id: '', // kaga assigns the id on create
       tenantId: dto.tenantId,
       slug: slugify(dto.slug),
       name: dto.name,
@@ -54,10 +53,10 @@ export class PrefabService {
       kitRef: dto.kitRef,
       previewUri: dto.previewUri,
     };
-    await this.repo.save(prefab);
-    await this.ctx.cache.prefab.del(prefabCacheKey(prefab.id));
-    await this.ctx.eventBus.emit({ type: 'prefab.registered', prefabId: prefab.id });
-    return prefab;
+    const saved = await this.repo.save(prefab);
+    await this.ctx.cache.prefab.del(prefabCacheKey(saved.id));
+    await this.ctx.eventBus.emit({ type: 'prefab.registered', prefabId: saved.id });
+    return saved;
   }
 
   async delete(id: PrefabId): Promise<boolean> {

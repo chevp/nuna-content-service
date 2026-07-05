@@ -1,25 +1,13 @@
 /**
- * Prefab catalog persistence.
+ * Prefab catalog persistence via kaga (kind='prefab').
  *
- * Indexes catalog metadata (`prefabs`) only. The `.prefab` kit itself lives in
- * storage, referenced by `kit_ref`; its interior (meshes, materials, ...) is
- * opaque to this service.
+ * Indexes catalog metadata only. The `.prefab` kit itself lives in storage,
+ * referenced by `kitRef`; its interior (meshes, materials, ...) is opaque to
+ * this service. kaga assigns the node id, which becomes the domain PrefabId.
  */
 
-import type { Database } from '../../core/db/mariadb';
-import { QueryBuilder } from '../../core/db/mariadb';
+import type { KagaClient } from '../../core/kaga/kaga-client';
 import type { PrefabCatalog, PrefabId } from '../../shared/types';
-
-interface PrefabRow {
-  id: string;
-  tenant_id: string;
-  slug: string;
-  name: string;
-  description: string | null;
-  tags_json: string | null;
-  kit_ref: string | null;
-  preview_uri: string | null;
-}
 
 export interface PrefabSummary {
   id: string;
@@ -28,56 +16,40 @@ export interface PrefabSummary {
 }
 
 export class PrefabRepository {
-  constructor(private readonly db: Database) {}
+  constructor(private readonly kaga: KagaClient) {}
 
-  async list(tenantId?: string): Promise<PrefabSummary[]> {
-    const qb = QueryBuilder.table('prefabs');
-    if (tenantId) qb.where('tenant_id', tenantId);
-    return this.db.run<PrefabSummary>(qb.order('name').select('id, slug, name'));
+  async list(): Promise<PrefabSummary[]> {
+    const nodes = await this.kaga.listNodes('prefab');
+    return nodes.map((n) => ({
+      id: n.id,
+      slug: typeof n.payload['slug'] === 'string' ? n.payload['slug'] : '',
+      name: n.label,
+    }));
   }
 
   async findById(id: PrefabId): Promise<PrefabCatalog | null> {
-    const rows = await this.db.run<PrefabRow>(
-      QueryBuilder.table('prefabs').where('id', id).limit(1).select(),
-    );
-    if (rows.length === 0) return null;
-    const row = rows[0];
-    return {
-      id: row.id,
-      tenantId: row.tenant_id,
-      slug: row.slug,
-      name: row.name,
-      description: row.description ?? undefined,
-      tags: row.tags_json ? (JSON.parse(row.tags_json) as string[]) : [],
-      kitRef: row.kit_ref ?? undefined,
-      previewUri: row.preview_uri ?? undefined,
-    };
+    const node = await this.kaga.getNode(id);
+    if (!node) return null;
+    const prefab = node.payload as unknown as PrefabCatalog;
+    return { ...prefab, id: node.id };
   }
 
-  async save(prefab: PrefabCatalog): Promise<void> {
-    const row = {
-      id: prefab.id,
-      tenant_id: prefab.tenantId,
-      slug: prefab.slug,
-      name: prefab.name,
-      description: prefab.description ?? null,
-      tags_json: JSON.stringify(prefab.tags ?? []),
-      kit_ref: prefab.kitRef ?? null,
-      preview_uri: prefab.previewUri ?? null,
+  /** Save a prefab. For new prefabs (empty id) kaga assigns the id; returns the saved entity. */
+  async save(prefab: PrefabCatalog): Promise<PrefabCatalog> {
+    const input = {
+      kind: 'prefab',
+      label: prefab.name,
+      payload: prefab as unknown as Record<string, unknown>,
     };
-    const existing = await this.db.run<PrefabRow>(
-      QueryBuilder.table('prefabs').where('id', prefab.id).limit(1).select('id'),
-    );
-    if (existing.length) {
-      const { id, ...rest } = row;
-      await this.db.exec(QueryBuilder.table('prefabs').where('id', id).update({ ...rest }));
-    } else {
-      await this.db.exec(QueryBuilder.table('prefabs').insert({ ...row }));
+    if (prefab.id) {
+      await this.kaga.updateNode(prefab.id, input);
+      return prefab;
     }
+    const node = await this.kaga.createNode(input);
+    return { ...prefab, id: node.id };
   }
 
   async delete(id: PrefabId): Promise<boolean> {
-    const affected = await this.db.exec(QueryBuilder.table('prefabs').where('id', id).delete());
-    return affected > 0;
+    return this.kaga.deleteNode(id);
   }
 }

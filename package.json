@@ -4,7 +4,6 @@
   "private": false,
   "description": "Nuna content service — world/scene/entity/asset/chunk content API with realtime gateway (MariaDB + Redis).",
   "license": "MIT",
-  "type": "module",
   "main": "dist/main.js",
   "engines": {
     "node": ">=20"

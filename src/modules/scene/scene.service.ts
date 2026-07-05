@@ -37,6 +37,7 @@ export class SceneService {
   async create(dto: CreateSceneDto): Promise<SceneRecord> {
     const scene: SceneRecord = {
       id: dto.id ?? base62Id(),
+      tenantId: dto.tenantId,
       name: dto.name,
       version: dto.version ?? DEFAULT_VERSION,
       doc: dto.doc,
@@ -50,6 +51,7 @@ export class SceneService {
     if (!current) return null;
     const next: SceneRecord = {
       id,
+      tenantId: dto.tenantId ?? current.tenantId,
       name: dto.name ?? current.name,
       version: dto.version ?? current.version,
       doc: dto.doc ?? current.doc,

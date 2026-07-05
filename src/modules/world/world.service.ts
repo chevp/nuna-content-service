@@ -37,6 +37,7 @@ export class WorldService {
     const id = dto.id ?? base62Id();
     const world: WorldComposition = {
       id,
+      tenantId: dto.tenantId,
       title: dto.title,
       version: dto.version ?? DEFAULT_VERSION,
       comment: dto.comment,

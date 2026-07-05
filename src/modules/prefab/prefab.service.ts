@@ -46,6 +46,7 @@ export class PrefabService {
   async register(dto: CreatePrefabDto): Promise<PrefabCatalog> {
     const prefab: PrefabCatalog = {
       id: base62Id(),
+      tenantId: dto.tenantId,
       slug: slugify(dto.slug),
       name: dto.name,
       description: dto.description,

@@ -9,7 +9,9 @@ individual entities, meshes, materials or coordinates — that is the iris engin
 Shapes mirror the container's `world.json`, `*.scene.json` and `.prefab`
 catalogs so documents round-trip losslessly.
 
-Backed by **MariaDB** (persistence) and **Redis** (cache / pub-sub).
+Persistence goes through **kaga** (the graph service, PostgreSQL-backed) — each
+composition noun is stored as a kaga node; **Redis** provides cache / pub-sub.
+The service holds no database of its own.
 
 ## Architecture
 
@@ -25,7 +27,7 @@ World ─ resolves a composition (palette + placements + gating) for a runtime
   ↓
 Cache Layer      world · scene · prefab caches
   ↓
-MariaDB
+kaga (graph service · PostgreSQL) — each noun stored as a node
 ```
 
 ### The four composition nouns
@@ -50,7 +52,7 @@ MariaDB
 
 ### Core (`src/core/`)
 
-- `db/` — `mariadb.ts` connection + `query-builder.ts`.
+- `kaga/` — `kaga-client.ts`: HTTP client for the kaga graph service (the persistence backend).
 - `cache/` — `memory-cache.ts` (hot tier) + `redis-cache.ts` (shared tier).
 - `events/` — `event-bus.ts`: `world.published`, `scene.updated`, `prefab.registered`, `session.statusChanged`.
 - `auth/` — bearer-token verification used by the gateway.
@@ -58,25 +60,26 @@ MariaDB
 
 ### Infrastructure (`src/infrastructure/`)
 
-Concrete driver adapters (`mariadb`, `redis`, `storage`). Each lazily loads its
-driver and falls back to an in-memory stub, so the service runs end-to-end with
-no external dependencies during development.
+Concrete driver adapters (`redis`, `storage`). Each lazily loads its driver and
+falls back to an in-memory stub, so the service runs end-to-end with no external
+dependencies during development.
 
-## Persistence: canonical doc + index tables
+## Persistence: canonical doc as a kaga node
 
-Each authored artifact is stored as its **canonical JSON document** (lossless
-round-trip with the container's files), with derived **index tables** for
-querying and gating:
+Each authored artifact is stored via **kaga** as a single node (`kind` =
+`world` / `scene` / `prefab` / `session`), with its full **canonical JSON
+document** in the node payload (lossless round-trip with the container's files).
+kaga owns the storage (PostgreSQL) and assigns each node's id, which becomes the
+domain id; there are no service-owned tables. Repositories (`*.repository.ts`)
+translate domain objects to/from kaga nodes.
 
-Generated record ids are **base62**, 11 chars (e.g. `7dKq2mX9aB0`).
+Generated record ids are **base62**, 11 chars (e.g. `7dKq2mX9aB0`) — assigned by kaga.
 
 ```
-worlds(id, title, version, comment, settings_json, doc_json)
-  placements(id, world_id, ordinal, scene_name,       -- placement index
-             when_prop, params_json)               -- params_json: opaque game data
-scenes(id, name, version, doc_json)
-prefabs(id, slug, name, description, tags_json, kit_ref, preview_uri)
-sessions(id, world_id, status, settings_json, runtime_endpoint, created_at)
+node(kind='world',   label=title, payload=WorldComposition)  -- placements embedded in payload
+node(kind='scene',   label=name,  payload=SceneRecord)
+node(kind='prefab',  label=name,  payload=PrefabCatalog)     -- kitRef → storage; kit is opaque
+node(kind='session', label=worldId, payload=GameSession)
 ```
 
 ## World resolution (the compose step)
@@ -138,9 +141,9 @@ npm run typecheck
 npm test
 ```
 
-Drivers (`mariadb`, `redis`, `ws`) are optional dependencies — the service
-boots with in-memory stubs if they're absent, so `npm run dev` works out of the
-box.
+Drivers (`redis`, `ws`) are optional dependencies — the service boots with
+in-memory stubs if they're absent. Persistence needs a reachable kaga (set
+`KAGA_URL`); `npm run dev` otherwise works out of the box.
 
 ## Run with Docker
 
@@ -148,29 +151,19 @@ box.
 docker compose -f docker/docker-compose.yml up --build
 ```
 
-Brings up MariaDB (migrations then seeds auto-applied on first boot from
-`migrations/` and `seeds/`), Redis, and the service on `:4000`.
-
-## Migrations & seeds
-
-- `migrations/001_init_schema.sql` — canonical composition schema.
-- `seeds/` — development dataset:
-  - `001_initial_world.sql` — two scenes + the `overworld` composition (with a gated garden placement).
-  - `002_forest_scene.sql` — a `forest` scene + a small world that places it twice.
-  - `003_prefabs.sql` — a `tree` prefab catalog + a sample game-session.
+Brings up PostgreSQL, kaga (the persistence backend), Redis, and the service on
+`:4000`.
 
 ## Layout
 
 ```
 src/
   app.ts            express app factory
-  main.ts           bootstrap (config → db/redis/storage → app → realtime)
+  main.ts           bootstrap (config → kaga/redis/storage → app → realtime)
   modules/          gateway · world · scene · prefab · session · realtime
-  core/             db · cache · events · auth · config
+  core/             kaga · cache · events · auth · config
   shared/           types · dto · utils · constants
-  infrastructure/   mariadb · redis · storage
-migrations/         ordered schema DDL
-seeds/              development dataset (initial world · forest scene · prefabs)
+  infrastructure/   redis · storage
 tests/
 docker/
 ```

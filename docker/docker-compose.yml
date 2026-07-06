@@ -1,20 +1,31 @@
+# Standalone dev stack for nuna-content-service.
+#
+# The service holds no database of its own: all persistence goes through kaga,
+# which is backed by PostgreSQL. This stack therefore brings up postgres + kaga
+# + redis + the content-service so `docker compose up` works end-to-end.
 services:
-  mariadb:
-    image: mariadb:11
+  db:
+    image: postgres:16-alpine
     environment:
-      MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: nuna_content
-      MARIADB_USER: nuna
-      MARIADB_PASSWORD: nuna
+      POSTGRES_DB: kaga
+      POSTGRES_USER: kaga
+      POSTGRES_PASSWORD: kaga
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      # Applied on first boot in filename order: migrations, then seeds.
-      - ../migrations/001_init_schema.sql:/docker-entrypoint-initdb.d/001_init_schema.sql:ro
-      - ../seeds/001_initial_world.sql:/docker-entrypoint-initdb.d/100_initial_world.sql:ro
-      - ../seeds/002_forest_scene.sql:/docker-entrypoint-initdb.d/101_forest_scene.sql:ro
-      - ../seeds/003_prefabs.sql:/docker-entrypoint-initdb.d/102_prefabs.sql:ro
-      - mariadb-data:/var/lib/mysql
+      - kaga-pgdata:/var/lib/postgresql/data
+
+  kaga:
+    build: ../../kaga
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/kaga
+      SPRING_DATASOURCE_USERNAME: kaga
+      SPRING_DATASOURCE_PASSWORD: kaga
+      KAGA_API_KEY_KOSMOS: ${KAGA_API_KEY_KOSMOS:-dev-kosmos-key}
+    ports:
+      - "8090:8090"
+    depends_on:
+      - db
 
   redis:
     image: redis:7-alpine
@@ -26,18 +37,16 @@ services:
       context: ..
       dockerfile: docker/Dockerfile
     depends_on:
-      - mariadb
+      - kaga
       - redis
     environment:
       PORT: 4000
       NODE_ENV: production
-      MARIADB_HOST: mariadb
-      MARIADB_USER: nuna
-      MARIADB_PASSWORD: nuna
-      MARIADB_DATABASE: nuna_content
+      KAGA_URL: http://kaga:8090
+      KAGA_API_KEY: ${KAGA_API_KEY_KOSMOS:-dev-kosmos-key}
       REDIS_URL: redis://redis:6379
     ports:
       - "4000:4000"
 
 volumes:
-  mariadb-data:
+  kaga-pgdata:

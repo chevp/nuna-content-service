@@ -2,7 +2,7 @@
   "name": "nuna-content-service",
   "version": "0.1.0",
   "private": false,
-  "description": "Nuna content service — world/scene/entity/asset/chunk content API with realtime gateway (MariaDB + Redis).",
+  "description": "Nuna content service — world/scene/entity/asset/chunk content API with realtime gateway (kaga/PostgreSQL + Redis).",
   "license": "MIT",
   "main": "dist/main.js",
   "engines": {
@@ -19,7 +19,6 @@
     "express": "^4.19.2"
   },
   "optionalDependencies": {
-    "mariadb": "^3.3.0",
     "redis": "^4.6.13",
     "ws": "^8.17.0"
   },

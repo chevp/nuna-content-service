@@ -7,7 +7,7 @@ export interface KagaNode {
   kind: string;
   label: string;
   payload: Record<string, unknown>;
-  source: string;
+  project?: string;
   createdAt: string;
   updatedAt: string;
 }

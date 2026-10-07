@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": false,
   "description": "Nuna content service — world/scene/entity/asset/chunk content API with realtime gateway (kaga/PostgreSQL + Redis).",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "main": "dist/main.js",
   "engines": {
     "node": ">=20"
